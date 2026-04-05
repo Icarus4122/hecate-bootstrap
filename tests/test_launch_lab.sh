@@ -64,6 +64,26 @@ assert_dir_exists "$LAB_ROOT/workspaces/target1/loot" "fallback: loot/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/target1/logs" "fallback: logs/ created"
 assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
 
+# ── Fallback degradation: must NOT have profile-specific dirs ──────
+# The fallback creates only 4 generic dirs.  Profile-specific dirs
+# like web/, creds/, exploits/ etc. must be absent so the operator
+# notices that Empusa is missing.
+
+for missing_dir in web creds exploits screenshots reports; do
+    if [[ -d "$LAB_ROOT/workspaces/target1/$missing_dir" ]]; then
+        _record_fail "fallback: ${missing_dir}/ must NOT exist" "present" "absent"
+    else
+        _record_pass "fallback: ${missing_dir}/ correctly absent"
+    fi
+done
+
+# Fallback must not create metadata file
+if [[ -f "$LAB_ROOT/workspaces/target1/.empusa-workspace.json" ]]; then
+    _record_fail "fallback: no metadata file" "present" "absent"
+else
+    _record_pass "fallback: no metadata file (correctly degraded)"
+fi
+
 # Case 2: workspace already exists -> skips creation
 ensure_workspace htb "target1" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "exists" "fallback: existing workspace detected"

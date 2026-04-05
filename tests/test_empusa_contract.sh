@@ -252,4 +252,53 @@ create_workspace(
 " 2>/dev/null || rc=$?
 assert_eq "0" "$rc" "set_active=True: no error"
 
+# ═══════════════════════════════════════════════════════════════════
+#  7. HTB profile dirs pinned (exact list)
+# ═══════════════════════════════════════════════════════════════════
+
+HTB_DIRS=$(_pyrun "
+from empusa.workspace import PROFILES
+print(' '.join(PROFILES['htb']['dirs']))
+")
+assert_eq "notes scans web creds loot exploits screenshots reports logs" \
+    "$HTB_DIRS" \
+    "htb profile dirs: exact pinned list"
+
+# ═══════════════════════════════════════════════════════════════════
+#  8. ALL_EVENTS contains workspace lifecycle events
+# ═══════════════════════════════════════════════════════════════════
+
+for evt in pre_workspace_init post_workspace_init on_workspace_select \
+           pre_build post_build pre_scan_host post_scan; do
+    has_evt=$(_pyrun "
+from empusa.events import ALL_EVENTS
+print('yes' if '${evt}' in ALL_EVENTS else 'no')
+")
+    assert_eq "yes" "$has_evt" "ALL_EVENTS contains '${evt}'"
+done
+
+# ═══════════════════════════════════════════════════════════════════
+#  9. make_event round-trip for workspace events
+# ═══════════════════════════════════════════════════════════════════
+
+roundtrip_ok=$(_pyrun "
+from empusa.events import make_event
+e = make_event('pre_workspace_init', workspace_name='box1', profile='htb')
+d = e.to_dict()
+ok = (d['event'] == 'pre_workspace_init'
+      and d['workspace_name'] == 'box1'
+      and d['profile'] == 'htb')
+print('ok' if ok else 'fail')
+")
+assert_eq "ok" "$roundtrip_ok" "make_event: pre_workspace_init round-trips"
+
+roundtrip_build=$(_pyrun "
+from empusa.events import make_event
+e = make_event('post_build', env_name='myenv', env_path='/tmp/x', ips=['10.0.0.1'])
+d = e.to_dict()
+ok = (d['env_name'] == 'myenv' and d['env_path'] == '/tmp/x' and d['ips'] == ['10.0.0.1'])
+print('ok' if ok else 'fail')
+")
+assert_eq "ok" "$roundtrip_build" "make_event: post_build round-trips"
+
 end_tests

@@ -43,6 +43,22 @@ assert_dir_exists "$LAB_ROOT/workspaces/testbox/loot" "fallback: loot/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/testbox/logs" "fallback: logs/ created"
 assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
 
+# ── Fallback degradation: must NOT have profile-specific dirs ──────
+for missing_dir in web creds exploits screenshots reports; do
+    if [[ -d "$LAB_ROOT/workspaces/testbox/$missing_dir" ]]; then
+        _record_fail "fallback: ${missing_dir}/ must NOT exist" "present" "absent"
+    else
+        _record_pass "fallback: ${missing_dir}/ correctly absent"
+    fi
+done
+
+# Fallback must not create metadata file
+if [[ -f "$LAB_ROOT/workspaces/testbox/.empusa-workspace.json" ]]; then
+    _record_fail "fallback: no metadata file" "present" "absent"
+else
+    _record_pass "fallback: no metadata file (correctly degraded)"
+fi
+
 # ═══════════════════════════════════════════════════════════════════
 #  Fallback: workspace already exists -> no error
 # ═══════════════════════════════════════════════════════════════════
@@ -59,5 +75,25 @@ PATH="$SAFE_PATH" bash "$SCRIPT" "buildbox" --profile build > "$OUT" 2>&1 || c=$
 assert_eq "0" "$c" "--profile flag: exits 0"
 assert_dir_exists "$LAB_ROOT/workspaces/buildbox" "--profile flag: workspace created"
 assert_contains "$(cat "$OUT")" "build" "--profile flag: output mentions profile name"
+
+# ═══════════════════════════════════════════════════════════════════
+#  --profile build fallback still creates only generic dirs
+# ═══════════════════════════════════════════════════════════════════
+# The build profile in Empusa has: src, out, notes, logs.  The fallback
+# knows nothing about profiles - it always creates the same 4 generic
+# dirs regardless of --profile.  This is intentional degradation.
+assert_dir_exists "$LAB_ROOT/workspaces/buildbox/notes" "build fallback: notes/ created"
+assert_dir_exists "$LAB_ROOT/workspaces/buildbox/scans" "build fallback: scans/ (generic)"
+assert_dir_exists "$LAB_ROOT/workspaces/buildbox/loot"  "build fallback: loot/ (generic)"
+assert_dir_exists "$LAB_ROOT/workspaces/buildbox/logs"  "build fallback: logs/ created"
+
+# Build profile-specific dirs must NOT exist in fallback
+for build_only in src out; do
+    if [[ -d "$LAB_ROOT/workspaces/buildbox/$build_only" ]]; then
+        _record_fail "build fallback: ${build_only}/ must NOT exist" "present" "absent"
+    else
+        _record_pass "build fallback: ${build_only}/ correctly absent (profile-unaware)"
+    fi
+done
 
 end_tests
