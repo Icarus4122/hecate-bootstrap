@@ -83,11 +83,11 @@ assert_contains "$(cat "$OUT")" "EMPUSA=empusa" \
 # ═══════════════════════════════════════════════════════════════════
 export LAB_ROOT="$SANDBOX/lab4"
 mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
-# No empusa binary anywhee.  Also strip our fakebin from PATH.
+# No empusa binary anywhere.  Also strip our fakebin from PATH.
 
 # Use a minimal PATH that excludes any empusa binary
 PATH="/usr/bin:/bin" bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
-assert_eq "EMPUSA=" "$(cat "$OUT" | t -d '\\n')" \
+assert_eq "EMPUSA=" "$(cat "$OUT" | tr -d '\\n')" \
     "neither venv no PATH → EMPUSA is empty"
 
 # ═══════════════════════════════════════════════════════════════════
