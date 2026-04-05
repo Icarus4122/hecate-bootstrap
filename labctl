@@ -11,7 +11,8 @@
 set -euo pipefail
 
 # ── Resolve paths ──────────────────────────────────────────────────
-REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO_DIR="$(cd "$(dirname "$SCRIPT_PATH")" && pwd)"
 export LAB_ROOT="${LAB_ROOT:-/opt/lab}"
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lab}"
 
