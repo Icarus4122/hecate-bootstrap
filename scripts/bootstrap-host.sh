@@ -17,7 +17,8 @@ echo "╚═══════════════════════�
 # 1. Host packages
 banner "1/8  Host apt packages"
 apt-get update
-xargs -a "$REPO_DIR/manifests/apt-host.txt" apt-get install -y --no-install-recommends
+grep -Ev '^\s*(#|$)' "$REPO_DIR/host-packages.txt" | \
+    xargs -r apt-get install -y --no-install-recommends
 
 # 2. Docker Engine
 banner "2/8  Docker Engine"
@@ -84,7 +85,7 @@ echo "labctl -> /usr/local/bin/labctl"
 echo ""
 echo "╔═══════════════════════════════════════════════════════════╗"
 echo "║  Done.  Next steps:                                       ║"
-echo "║    1. Rre-login (docker group)                             ║"
+echo "║    1. Re-login (docker group)                             ║"
 echo "║    2. vim .env                                            ║"
 echo "║    3. labctl sync                                         ║"
 echo "║    4. labctl build                                        ║"

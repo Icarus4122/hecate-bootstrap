@@ -1,0 +1,305 @@
+// Multi-root workspace for Empusa + Hecate-bootstrap development.
+// Open with: File > Open Workspace from File…  or:  code empusa-hecate.code-workspace
+// See: hecate-bootstrap/docs/dev/vscode-workspace.md for contributor guide.
+{
+    "folders": [
+        { "path": "empusa", "name": "empusa" },
+        { "path": "hecate-bootstrap", "name": "hecate" }
+    ],
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Settings — shared cross-repo editor/tool behavior
+    // ═══════════════════════════════════════════════════════════════
+    "settings": {
+        // ── Line endings & whitespace ─────────────────────────────
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+
+        // ── Python: Ruff format-on-save (Python files only) ──────
+        "[python]": {
+            "editor.defaultFormatter": "charliermarsh.ruff",
+            "editor.formatOnSave": true
+        },
+
+        // ── Python testing (Empusa) ──────────────────────────────
+        "python.testing.pytestEnabled": true,
+        "python.testing.pytestArgs": ["--tb=short"],
+        "python.testing.cwd": "${workspaceFolder:empusa}",
+
+        // ── ShellCheck ───────────────────────────────────────────
+        "shellcheck.enable": true,
+
+        // ── File associations ────────────────────────────────────
+        "files.associations": {
+            "labctl": "shellscript"
+        },
+
+        // ── Terminal: Linux-first, Windows Git Bash fallback ─────
+        "terminal.integrated.defaultProfile.linux": "bash",
+        "terminal.integrated.defaultProfile.windows": "Git Bash",
+        "terminal.integrated.profiles.windows": {
+            "Git Bash": {
+                "path": "C:\\Program Files\\Git\\bin\\bash.exe"
+            }
+        },
+
+        // ── Editor ───────────────────────────────────────────────
+        "editor.rulers": [120],
+
+        // ── Noise reduction ──────────────────────────────────────
+        "search.exclude": {
+            "**/__pycache__": true,
+            "**/build": true,
+            "**/*.egg-info": true
+        },
+        "files.exclude": {
+            "**/__pycache__": true,
+            "**/*.pyc": true
+        }
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Extensions — lean but complete
+    // ═══════════════════════════════════════════════════════════════
+    "extensions": {
+        "recommendations": [
+            "ms-python.python",
+            "charliermarsh.ruff",
+            "timonwong.shellcheck",
+            "mads-hartmann.bash-ide-vscode",
+            "eamodio.gitlens",
+            "yzhang.markdown-all-in-one",
+            "tamasfe.even-better-toml",
+            "redhat.vscode-yaml",
+            "bierner.markdown-mermaid",
+            "ms-azuretools.vscode-docker",
+            "foam.foam-vscode"
+        ]
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Tasks
+    // ═══════════════════════════════════════════════════════════════
+    "tasks": {
+        "version": "2.0.0",
+        "tasks": [
+            // ── Empusa: Ruff ─────────────────────────────────────
+            {
+                "label": "Empusa: Ruff format",
+                "detail": "Auto-format Python source and tests",
+                "type": "shell",
+                "command": "python -m ruff format empusa/ tests/",
+                "options": { "cwd": "${workspaceFolder:empusa}" }
+            },
+            {
+                "label": "Empusa: Ruff check",
+                "detail": "Lint Python source and tests",
+                "type": "shell",
+                "command": "python -m ruff check empusa/ tests/",
+                "options": { "cwd": "${workspaceFolder:empusa}" },
+                "group": { "kind": "build", "isDefault": true }
+            },
+
+            // ── Empusa: Pytest ───────────────────────────────────
+            {
+                "label": "Empusa: Pytest all",
+                "detail": "Run the full Empusa test suite",
+                "type": "shell",
+                "command": "python -m pytest",
+                "options": { "cwd": "${workspaceFolder:empusa}" },
+                "group": { "kind": "test", "isDefault": true }
+            },
+            {
+                "label": "Empusa: Pytest current file",
+                "detail": "Run tests in the currently open file",
+                "type": "shell",
+                "command": "python -m pytest \"${file}\"",
+                "options": { "cwd": "${workspaceFolder:empusa}" },
+                "group": "test"
+            },
+            {
+                "label": "Empusa: Pytest nearest",
+                "detail": "Run a single test by name (pytest -k)",
+                "type": "shell",
+                "command": "python -m pytest \"${file}\" -k \"${input:testName}\"",
+                "options": { "cwd": "${workspaceFolder:empusa}" },
+                "group": "test"
+            },
+            {
+                // Contract-pinning test subset.  Update file list as
+                // contract tests are added or reorganised.
+                "label": "Empusa: Pytest contract",
+                "detail": "Run contract-pinning test subset",
+                "type": "shell",
+                "command": "python -m pytest tests/test_events.py tests/test_bus.py tests/test_cli_workspace.py tests/test_workspace_build_e2e.py -v",
+                "options": { "cwd": "${workspaceFolder:empusa}" },
+                "group": "test"
+            },
+
+            // ── Hecate: Shell tests ──────────────────────────────
+            {
+                "label": "Hecate: Run shell tests",
+                "detail": "Run all Hecate shell tests (tests/run-all.sh)",
+                "type": "shell",
+                "command": "bash tests/run-all.sh",
+                "options": { "cwd": "${workspaceFolder:hecate}" },
+                "group": "test",
+                "windows": {
+                    "options": {
+                        "shell": {
+                            "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                            "args": ["-c"]
+                        }
+                    }
+                }
+            },
+            {
+                "label": "Hecate: Run Empusa contract test",
+                "detail": "Validate Hecate integration assumptions against Empusa",
+                "type": "shell",
+                "command": "bash tests/test_empusa_contract.sh",
+                "options": { "cwd": "${workspaceFolder:hecate}" },
+                "group": "test",
+                "windows": {
+                    "options": {
+                        "shell": {
+                            "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                            "args": ["-c"]
+                        }
+                    }
+                }
+            },
+            {
+                "label": "Hecate: Run launch-lab test",
+                "detail": "Run launch-lab.sh test suite",
+                "type": "shell",
+                "command": "bash tests/test_launch_lab.sh",
+                "options": { "cwd": "${workspaceFolder:hecate}" },
+                "group": "test",
+                "windows": {
+                    "options": {
+                        "shell": {
+                            "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                            "args": ["-c"]
+                        }
+                    }
+                }
+            },
+            {
+                "label": "Hecate: Run create-workspace test",
+                "detail": "Run create-workspace.sh test suite",
+                "type": "shell",
+                "command": "bash tests/test_create_workspace.sh",
+                "options": { "cwd": "${workspaceFolder:hecate}" },
+                "group": "test",
+                "windows": {
+                    "options": {
+                        "shell": {
+                            "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                            "args": ["-c"]
+                        }
+                    }
+                }
+            },
+
+            // ── Cross-repo ───────────────────────────────────────
+            {
+                "label": "Cross-repo: Release sanity",
+                "detail": "Read-only check: versions, changelog, lint, tests (both repos)",
+                "type": "shell",
+                "command": "bash scripts/dev/release-sanity.sh",
+                "options": { "cwd": "${workspaceFolder:hecate}" },
+                "presentation": { "reveal": "always", "panel": "dedicated" },
+                "windows": {
+                    "options": {
+                        "shell": {
+                            "executable": "C:\\Program Files\\Git\\bin\\bash.exe",
+                            "args": ["-c"]
+                        }
+                    }
+                }
+            },
+
+            // ── Compound tasks ───────────────────────────────────
+            {
+                "label": "Empusa: format + lint + test",
+                "detail": "Full Empusa quality gate: format then lint then test",
+                "dependsOn": [
+                    "Empusa: Ruff format",
+                    "Empusa: Ruff check",
+                    "Empusa: Pytest all"
+                ],
+                "dependsOrder": "sequence"
+            },
+            {
+                "label": "Hecate: shell test suite",
+                "detail": "Full Hecate shell test suite",
+                "dependsOn": ["Hecate: Run shell tests"],
+                "dependsOrder": "sequence"
+            },
+            {
+                "label": "Cross-repo: Contract sanity",
+                "detail": "Empusa contract tests then Hecate contract test",
+                "dependsOn": [
+                    "Empusa: Pytest contract",
+                    "Hecate: Run Empusa contract test"
+                ],
+                "dependsOrder": "sequence"
+            }
+        ],
+        "inputs": [
+            {
+                "id": "testName",
+                "type": "promptString",
+                "description": "Test name or pytest -k expression"
+            }
+        ]
+    },
+
+    // ═══════════════════════════════════════════════════════════════
+    //  Launch / Debug
+    // ═══════════════════════════════════════════════════════════════
+    "launch": {
+        "version": "0.2.0",
+        "configurations": [
+            {
+                "name": "Empusa: interactive",
+                "type": "debugpy",
+                "request": "launch",
+                "module": "empusa",
+                "cwd": "${workspaceFolder:empusa}",
+                "console": "integratedTerminal",
+                "justMyCode": true
+            },
+            {
+                "name": "Empusa: pytest file",
+                "type": "debugpy",
+                "request": "launch",
+                "module": "pytest",
+                "args": ["${file}", "--tb=short", "-q"],
+                "cwd": "${workspaceFolder:empusa}",
+                "console": "integratedTerminal",
+                "justMyCode": true
+            },
+            {
+                "name": "Empusa: debug current test",
+                "type": "debugpy",
+                "request": "launch",
+                "module": "pytest",
+                "args": ["${file}", "-k", "${input:testName}", "--no-header", "-rN"],
+                "cwd": "${workspaceFolder:empusa}",
+                "console": "integratedTerminal",
+                "justMyCode": true,
+                "purpose": ["debug-test"]
+            }
+        ],
+        "inputs": [
+            {
+                "id": "testName",
+                "type": "promptString",
+                "description": "Test name or pytest -k expression"
+            }
+        ]
+    }
+}

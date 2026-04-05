@@ -1,5 +1,5 @@
 # apt-host.txt - Ubuntu 24.04 host packages.
-# Consumed by scripts/bootstrap-host.sh.
+# Consumed by scripts/bootstrap-host.sh
 
 ca-certificates
 curl
