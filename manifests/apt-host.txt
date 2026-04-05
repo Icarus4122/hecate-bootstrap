@@ -1,0 +1,22 @@
+# apt-host.txt — Ubuntu 24.04 host packages.
+# Consumed by scripts/bootstrap-host.sh.
+
+ca-certificates
+curl
+gnupg
+lsb-release
+openvpn
+wireguard-tools
+tmux
+git
+jq
+unzip
+wget
+net-tools
+iputils-ping
+dnsutils
+htop
+python3
+python3-pip
+python3-venv
+pipx

@@ -1,0 +1,343 @@
+#!/usr/bin/env bash
+# scripts/sync-binaries.sh — Manifest-driven download of pinned external binaries.
+# Reads manifests/binaries.tsv → writes to ${LAB_ROOT}/tools/binaries/.
+#
+# Usage:
+#   sync-binaries.sh                    Sync all manifest entries
+#   sync-binaries.sh --name chisel      Sync only the entry named "chisel"
+#   sync-binaries.sh --dry-run          Preview without downloading
+#
+# Requires: curl, jq, file
+# Optional: GITHUB_TOKEN env var for higher API rate limits (60 → 5000 req/h)
+set -euo pipefail
+
+# ── Paths ──────────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(dirname "$SCRIPT_DIR")"
+MANIFEST="${REPO_DIR}/manifests/binaries.tsv"
+BIN_DIR="${LAB_ROOT:-/opt/lab}/tools/binaries"
+
+# ── State ──────────────────────────────────────────────────────────────────────
+DRY_RUN=false
+FILTER=""
+ERRORS=0
+SYNCED=0
+SKIPPED=0
+
+# ── Usage ──────────────────────────────────────────────────────────────────────
+usage() {
+    cat <<'EOF'
+Usage: sync-binaries.sh [OPTIONS]
+
+Download pinned external binaries listed in manifests/binaries.tsv
+into ${LAB_ROOT}/tools/binaries/.
+
+Options:
+  -n, --name NAME   Sync only the named manifest entry
+  --dry-run         Preview what would be downloaded (no writes)
+  -h, --help        Show this help
+
+Environment:
+  LAB_ROOT          Base lab directory       (default: /opt/lab)
+  GITHUB_TOKEN      GitHub PAT — raises API rate limit from 60 to 5 000 req/h
+EOF
+    exit 0
+}
+
+# ── Argument parsing ───────────────────────────────────────────────────────────
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -n|--name)
+            [[ -z "${2:-}" ]] && { echo "[!] --name requires an argument" >&2; exit 1; }
+            FILTER="$2"; shift 2 ;;
+        --dry-run) DRY_RUN=true; shift ;;
+        -h|--help) usage ;;
+        *) echo "[!] Unknown option: $1" >&2; exit 1 ;;
+    esac
+done
+
+# ── Dependency check ──────────────────────────────────────────────────────────
+missing=()
+for cmd in curl jq file; do
+    command -v "$cmd" &>/dev/null || missing+=("$cmd")
+done
+if [[ ${#missing[@]} -gt 0 ]]; then
+    echo "[!] Missing required commands: ${missing[*]}" >&2
+    exit 1
+fi
+
+# ── GitHub API helpers ─────────────────────────────────────────────────────────
+gh_curl_opts=(-fsSL -H "Accept: application/vnd.github+json")
+if [[ -n "${GITHUB_TOKEN:-}" ]]; then
+    gh_curl_opts+=(-H "Authorization: Bearer ${GITHUB_TOKEN}")
+fi
+
+declare -A _release_cache
+
+# Fetch and cache release JSON for a given repo + tag.
+fetch_release() {
+    local repo="$1" tag="$2"
+    local key="${repo}@${tag}"
+
+    if [[ -v _release_cache["$key"] ]]; then
+        printf '%s' "${_release_cache[$key]}"
+        return 0
+    fi
+
+    local url="https://api.github.com/repos/${repo}/releases/tags/${tag}"
+    local json
+    if ! json="$(curl "${gh_curl_opts[@]}" "$url")"; then
+        echo "    ✗ GitHub API request failed: ${url}" >&2
+        return 1
+    fi
+
+    if ! printf '%s' "$json" | jq -e '.assets' &>/dev/null; then
+        echo "    ✗ Unexpected API response — no .assets array" >&2
+        echo "      URL: ${url}" >&2
+        return 1
+    fi
+
+    _release_cache["$key"]="$json"
+    printf '%s' "$json"
+}
+
+# ── File validation ────────────────────────────────────────────────────────────
+# Inspect a downloaded file with file(1) and reject bogus content.
+#   $1 = path   $2 = "true" to permit text/JSON content
+validate_download() {
+    local fpath="$1" allow_text="${2:-false}"
+    local ftype
+    ftype="$(file -b "$fpath")"
+
+    # HTML is always rejected — strong indicator of a redirect or error page.
+    if [[ "$ftype" == *"HTML document"* ]]; then
+        echo "    ✗ Rejected: HTML document (download likely returned an error page)"
+        echo "      file(1): ${ftype}"
+        return 1
+    fi
+
+    # XML is always rejected for the same reason.
+    if [[ "$ftype" == *"XML document"* ]]; then
+        echo "    ✗ Rejected: XML document"
+        echo "      file(1): ${ftype}"
+        return 1
+    fi
+
+    # Text / JSON rejected unless the caller explicitly allows it.
+    if [[ "$allow_text" != "true" ]]; then
+        if [[ "$ftype" == *"text"* || "$ftype" == *"JSON"* ]]; then
+            echo "    ✗ Rejected: file identified as text, not binary/archive"
+            echo "      file(1): ${ftype}"
+            return 1
+        fi
+    fi
+
+    return 0
+}
+
+# ── Download a single file ─────────────────────────────────────────────────────
+#   $1=url  $2=dest_path  $3=allow_text  $4=make_executable
+download_one() {
+    local url="$1" dest="$2" allow_text="$3" make_exec="$4"
+    local tmp="${dest}.tmp.$$"
+
+    if ! curl -fsSL -o "$tmp" "$url"; then
+        echo "    ✗ Download failed"
+        echo "      URL: ${url}"
+        rm -f "$tmp"
+        return 1
+    fi
+
+    if ! validate_download "$tmp" "$allow_text"; then
+        rm -f "$tmp"
+        return 1
+    fi
+
+    mv "$tmp" "$dest"
+
+    if [[ "$make_exec" == "true" ]]; then
+        chmod +x "$dest"
+    fi
+
+    local desc
+    desc="$(file -b "$dest" | head -c 72)"
+    echo "    ✓ ${desc}"
+    return 0
+}
+
+# ── File size (bytes) ──────────────────────────────────────────────────────────
+file_size() { stat --format='%s' "$1" 2>/dev/null; }
+
+# ── Process one manifest entry ─────────────────────────────────────────────────
+process_entry() {
+    local name="$1" type="$2" repo="$3" tag="$4" mode="$5" dest="$6" flags="$7"
+    local target_dir="${BIN_DIR}/${dest}"
+
+    # Parse flags
+    local allow_text=false make_exec=false
+    [[ "$flags" == *allow-text* ]] && allow_text=true
+    [[ "$flags" == *executable* ]] && make_exec=true
+
+    case "$type" in
+        github-release)
+            echo "[*] ${name}  (${repo} @ ${tag},  mode=${mode})"
+
+            local json
+            json="$(fetch_release "$repo" "$tag")" || { ERRORS=$((ERRORS + 1)); return; }
+
+            if [[ "$mode" == "all-assets" ]]; then
+                # Download every release asset into dest/.
+                # all-assets implies allow-text — checksums and signatures are expected.
+                local asset_allow_text=true
+
+                mkdir -p "$target_dir"
+
+                local asset_count
+                asset_count="$(printf '%s' "$json" | jq '.assets | length')"
+                echo "    ${asset_count} asset(s) in release"
+
+                local -a lines
+                readarray -t lines < <(printf '%s' "$json" | jq - \
+                    '.assets[] | [.name, .browser_download_url, (.size | tostring)] | @tsv')
+
+                for line in "${lines[@]}"; do
+                    [[ -z "$line" ]] && continue
+                    local a_name a_url a_size
+                    IFS=$'\t' read -r a_name a_url a_size <<< "$line"
+                    local a_dest="${target_dir}/${a_name}"
+
+                    # Idempotency: skip if file exists with matching size.
+                    if [[ -f "$a_dest" ]]; then
+                        local existing
+                        existing="$(file_size "$a_dest")"
+                        if [[ "$existing" == "$a_size" ]]; then
+                            echo "    [=] ${a_name}  (${a_size} B)"
+                            SKIPPED=$((SKIPPED + 1))
+                            continue
+                        fi
+                        echo "    [~] ${a_name}  size differs — re-downloading"
+                        rm -f "$a_dest"
+                    fi
+
+                    echo "    [+] ${a_name}  (${a_size} B)"
+
+                    if $DRY_RUN; then
+                        echo "        → ${a_dest}"
+                        continue
+                    fi
+
+                    if download_one "$a_url" "$a_dest" "$asset_allow_text" "$make_exec"; then
+                        SYNCED=$((SYNCED + 1))
+                    else
+                        ERRORS=$((ERRORS + 1))
+                    fi
+                done
+
+            else
+                # mode = exact asset filename — download that single file.
+                mkdir -p "$target_dir"
+
+                local a_info
+                a_info="$(printf '%s' "$json" | jq -r --ag pat "$mode" \
+                    '.assets[] | select(.name == $pat) | [.name, .browser_download_url, (.size | tostring)] | @tsv')"
+
+                if [[ -z "$a_info" ]]; then
+                    echo "    ✗ Asset not found: ${mode}"
+                    echo "    Available assets:"
+                    printf '%s' "$json" | jq -r '.assets[].name' | sed 's/^/      /'
+                    ERRORS=$((ERRORS + 1))
+                    return
+                fi
+
+                local a_name a_url a_size
+                IFS=$'\t' read -r a_name a_url a_size <<< "$a_info"
+                local a_dest="${target_dir}/${a_name}"
+
+                if [[ -f "$a_dest" ]]; then
+                    local existing
+                    existing="$(file_size "$a_dest")"
+                    if [[ "$existing" == "$a_size" ]]; then
+                        echo "    [=] ${a_name}  (${a_size} B)"
+                        SKIPPED=$((SKIPPED + 1))
+                        return
+                    fi
+                    echo "    [~] ${a_name}  size differs — re-downloading"
+                    rm -f "$a_dest"
+                fi
+
+                echo "    [+] ${a_name}  (${a_size} B)"
+
+                if $DRY_RUN; then
+                    echo "        → ${a_dest}"
+                    return
+                fi
+
+                if download_one "$a_url" "$a_dest" "$allow_text" "$make_exec"; then
+                    SYNCED=$((SYNCED + 1))
+                else
+                    ERRORS=$((ERRORS + 1))
+                fi
+            fi
+            ;;
+
+        *)
+            echo "[!] Unknown source type '${type}' for entry '${name}'" >&2
+            ERRORS=$((ERRORS + 1))
+            ;;
+    esac
+}
+
+# ── Main ───────────────────────────────────────────────────────────────────────
+main() {
+    if [[ ! -f "$MANIFEST" ]]; then
+        echo "[!] Manifest not found: ${MANIFEST}" >&2
+        exit 1
+    fi
+
+    $DRY_RUN || mkdir -p "$BIN_DIR"
+
+    echo "[*] Syncing pinned binaries → ${BIN_DIR}"
+    $DRY_RUN && echo "[*] DRY-RUN — no files will be written"
+    echo ""
+
+    local matched=0
+
+    while IFS=$'\t' read -r f_name f_type f_repo f_tag f_mode f_dest f_flags || [[ -n "${f_name:-}" ]]; do
+        # Skip blanks, comments, header row.
+        [[ -z "$f_name" || "$f_name" =~ ^[[:space:]]*# || "$f_name" == "name" ]] && continue
+
+        f_flags="${f_flags:--}"
+
+        # Apply --name filter.
+        if [[ -n "$FILTER" && "$f_name" != "$FILTER" ]]; then
+            continue
+        fi
+
+        matched=$((matched + 1))
+        process_entry "$f_name" "$f_type" "$f_repo" "$f_tag" "$f_mode" "$f_dest" "$f_flags"
+        echo ""
+    done < "$MANIFEST"
+
+    # ── Summary ────────────────────────────────────────────────────────────────
+    if [[ -n "$FILTER" && "$matched" -eq 0 ]]; then
+        echo "[!] No manifest entry named '${FILTER}'" >&2
+        exit 1
+    fi
+
+    echo "── Summary ──────────────────────────────────────────────"
+    echo "  entries processed : ${matched}"
+    echo "  files downloaded  : ${SYNCED}"
+    echo "  files skipped     : ${SKIPPED}"
+    echo "  errors            : ${ERRORS}"
+
+    if [[ "$ERRORS" -gt 0 ]]; then
+        echo ""
+        echo "[!] ${ERRORS} error(s) — review output above." >&2
+        exit 1
+    fi
+
+    echo ""
+    echo "[✓] Sync complete."
+}
+
+main "$@"

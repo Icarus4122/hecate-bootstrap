@@ -1,0 +1,16 @@
+# compose/docker-compose.gpu.yml — NVIDIA GPU passthrough overlay.
+# Stacked when: labctl up --gpu   (or LAB_GPU=1)
+# Requires: nvidia-container-toolkit on the host.
+
+services:
+  kali-main:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility

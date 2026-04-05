@@ -1,0 +1,45 @@
+# apt-packages.txt — Build / cross-compile / packaging packages.
+# Consumed by: docker/builder/Dockerfile (Ubuntu 24.04 base)
+#
+# Policy:
+#   - Build and helper tooling only — not daily operator tools
+#   - No nmap, ffuf, gobuster, responder, impacket-scripts, evil-winrm
+#   - No GUI desktop packages
+#   - No baked-in payload artifacts
+
+# ── Core utilities ─────────────────────────────────────────────────
+bash-completion
+ca-certificates
+curl
+file
+git
+jq
+make
+pkg-config
+unzip
+wget
+zip
+
+# ── Compilers / build tools ────────────────────────────────────────
+build-essential
+cmake
+gcc-multilib
+g++-multilib
+nasm
+
+# ── Cross-compilation / packaging ─────────────────────────────────
+mingw-w64
+upx-ucl
+wine
+
+# ── Languages ──────────────────────────────────────────────────────
+golang-go
+pipx
+python3
+python3-pip
+python3-venv
+
+# NOTE: veil is intentionally omitted.  It pulls in a large Ruby/Wine
+#       bootstrap and frequently breaks on clean installs.  If needed,
+#       install manually inside a running container or build a
+#       dedicated veil image.

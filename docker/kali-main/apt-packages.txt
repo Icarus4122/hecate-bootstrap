@@ -1,0 +1,69 @@
+# apt-packages.txt — Kali operator packages for kali-main.
+# Consumed by: docker/kali-main/Dockerfile
+#
+# Policy:
+#   - CLI only — no GUI / desktop packages
+#   - No heavy build-chain tools (use the builder image)
+#   - No mingw-w64, wine, veil, or baked-in payload artifacts
+
+# ── Core shell / utilities ─────────────────────────────────────────
+bash-completion
+ca-certificates
+curl
+dnsutils
+file
+git
+iproute2
+iputils-ping
+jq
+less
+net-tools
+procps
+tmux
+unzip
+vim
+wget
+zip
+
+# ── Python ─────────────────────────────────────────────────────────
+pipx
+python3
+python3-pip
+python3-venv
+
+# ── Recon / network ───────────────────────────────────────────────
+dnsrecon
+enum4linux
+nbtscan
+nmap
+onesixtyone
+oscanner
+redis-tools
+snmp
+sslscan
+
+# ── Web ────────────────────────────────────────────────────────────
+feroxbuster
+ffuf
+gobuster
+nikto
+whatweb
+
+# ── Windows / AD / auth ───────────────────────────────────────────
+evil-winrm
+impacket-scripts
+netexec
+responder
+smbclient
+smbmap
+bloodhound
+
+# NOTE: sharphound is not available as a Kali apt package.
+#       It is a .NET assembly intended for execution on Windows targets.
+
+# ── Post-exploitation / misc ──────────────────────────────────────
+libimage-exiftool-perl
+seclists
+sipvicious
+swaks
+tnscmd10g

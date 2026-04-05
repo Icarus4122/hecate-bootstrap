@@ -1,0 +1,23 @@
+# ── Secrets / credentials ──────────────────────────────────────────
+.env
+*.ovpn
+*.conf.secret
+creds/
+
+# ── Operational artifacts — never version ─────────────────────────
+loot/
+screenshots/
+*.pcap
+
+# ── Editor / OS ───────────────────────────────────────────────────
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Runtime / build ───────────────────────────────────────────────
+__pycache__/
+*.pyc
+.venv/
+node_modules/

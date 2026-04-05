@@ -1,0 +1,47 @@
+# compose/docker-compose.yml — Base stack (bridge network).
+#
+# Override files stacked by labctl:
+#   --gpu      → docker-compose.gpu.yml
+#   --hostnet  → docker-compose.hostnet.yml
+
+services:
+  kali-main:
+    build:
+      context: ..
+      dockerfile: docker/kali-main/Dockerfile
+    container_name: lab-kali
+    hostname: kali
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    working_dir: /opt/lab
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    env_file:
+      - ../.env
+    volumes:
+      - ${LAB_ROOT:-/opt/lab}/data:/opt/lab/data
+      - ${LAB_ROOT:-/opt/lab}/tools:/opt/lab/tools
+      - ${LAB_ROOT:-/opt/lab}/resources:/opt/lab/resources
+      - ${LAB_ROOT:-/opt/lab}/workspaces:/opt/lab/workspaces
+      - ${LAB_ROOT:-/opt/lab}/knowledge:/opt/lab/knowledge
+      - ${LAB_ROOT:-/opt/lab}/templates:/opt/lab/templates
+      - ../tmux:/etc/tmux.d:ro
+
+  builder:
+    build:
+      context: ..
+      dockerfile: docker/builder/Dockerfile
+    container_name: lab-builder
+    hostname: builder
+    profiles: ["build"]
+    stdin_open: true
+    tty: true
+    working_dir: /opt/lab
+    env_file:
+      - ../.env
+    volumes:
+      - ${LAB_ROOT:-/opt/lab}/data:/opt/lab/data
+      - ${LAB_ROOT:-/opt/lab}/tools:/opt/lab/tools
+      - ${LAB_ROOT:-/opt/lab}/resources:/opt/lab/resources

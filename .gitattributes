@@ -1,0 +1,26 @@
+# Auto-detect text files and normalise line endings
+* text=auto
+
+# Shell / config — always LF
+*.sh text eol=lf
+labctl text eol=lf
+.tmux.conf text eol=lf
+*.conf text eol=lf
+
+# Markdown / docs
+*.md text diff=markdown
+*.txt text
+
+# Data files
+*.json text
+*.toml text
+*.yml text
+*.yaml text
+*.tsv text
+
+# Dockerfile
+Dockerfile text
+
+# Binary — do not diff
+*.png binary
+*.jpg binary

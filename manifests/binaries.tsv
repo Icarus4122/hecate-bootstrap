@@ -1,0 +1,21 @@
+# manifests/binaries.tsv — Pinned external binaries.
+# Tab-separated: name  type  repo  tag  mode  dest  flags
+#
+# Columns:
+#   name    – human label (used with --name filter)
+#   type    – source type: github-release
+#   repo    – GitHub owner/repo
+#   tag     – release tag (e.g. v1.11.4)
+#   mode    – "all-assets" to grab every file, or exact asset filename
+#   dest    – subdirectory under ${LAB_ROOT}/tools/binaries/
+#   flags   – dash for none; comma-separated: executable, allow-text
+#
+# After editing: labctl sync   (or scripts/sync-binaries.sh directly)
+#
+name	type	repo	tag	mode	dest	flags
+chisel	github-release	jpillora/chisel	v1.11.4	all-assets	chisel/v1.11.4	-
+#
+# ── Examples (uncomment and adjust to activate) ────────────────────────────────
+#kerbrute	github-release	ropnop/kerbrute	v1.0.3	kerbrute_linux_amd64	kerbrute	executable
+#pspy	github-release	DominicBreuker/pspy	v1.2.1	pspy64	pspy	executable
+#ligolo-proxy	github-release	nicocha30/ligolo-ng	v0.7.5	all-assets	ligolo/v0.7.5	-

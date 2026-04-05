@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  shell-tests:
+    name: Shell tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Ensure dependencies
+        run: |
+          # Tests need: bash ≥4, file, jq, curl (all present on ubuntu-latest).
+          # Explicit check so failures are obvious if the runner image changes.
+          for cmd in bash file jq curl; do
+            command -v "$cmd" >/dev/null || { echo "::error::Missing $cmd"; exit 1; }
+          done
+          echo "All dependencies present."
+
+      - name: Run test suite
+        run: bash tests/run-all.sh

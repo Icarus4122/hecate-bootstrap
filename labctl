@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+# labctl — Top-level control surface for the offensive-security lab.
+#
+# This is a thin dispatcher.  Each subcommand maps to a function below
+# or to a script under scripts/.  Compose file stacking, profile
+# selection, and environment wiring happen here so that the operator
+# never has to remember the underlying compose incantations.
+#
+# Usage:  labctl <command> [flags]
+# Help:   labctl help
+set -euo pipefail
+
+# ── Resolve paths ──────────────────────────────────────────────────
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+export LAB_ROOT="${LAB_ROOT:-/opt/lab}"
+export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lab}"
+
+# ── Compose file stacker ──────────────────────────────────────────
+source "${REPO_DIR}/scripts/lib/compose.sh"
+
+# ── Subcommands ────────────────────────────────────────────────────
+
+cmd_up() {
+    local profiles=()
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+            --gpu)      export LAB_GPU=1;      shift ;;
+            --hostnet)  export LAB_HOSTNET=1;   shift ;;
+            --builder)  profiles+=(--profile build); shift ;;
+            *) echo "[!] Unknown flag: $1" >&2; return 1 ;;
+        esac
+    done
+    _compose "${profiles[@]}" up -d
+    echo "[✓] Lab is running.  Attach: labctl shell"
+}
+
+cmd_down() {
+    _compose down "$@"
+}
+
+cmd_build() {
+    local extra=()
+    [[ "${1:-}" == "--no-cache" ]] && extra=(--no-cache)
+    _compose build "${extra[@]}"
+}
+
+cmd_rebuild() {
+    _compose build --no-cache
+    echo "[✓] Rebuilt.  Run: labctl up"
+}
+
+cmd_shell() {
+    local target="${1:-kali-main}"
+    _compose exec "$target" /bin/bash
+}
+
+cmd_logs() {
+    if [[ -n "${1:-}" ]]; then
+        _compose logs -f "$1"
+    else
+        _compose logs -f
+    fi
+}
+
+cmd_sync() {
+    bash "$REPO_DIR/scripts/sync-binaries.sh" "$@"
+}
+
+cmd_launch() {
+    bash "$REPO_DIR/scripts/launch-lab.sh" "$@"
+}
+
+cmd_tmux() {
+    local profile="${1:-}"
+    if [[ -z "$profile" ]]; then
+        echo "Available tmux profiles:"
+        for f in "$REPO_DIR"/tmux/profiles/*.sh; do
+            [[ -e "$f" ]] || continue
+            basename "$f" .sh
+        done
+        return 0
+    fi
+    local script="$REPO_DIR/tmux/profiles/${profile}.sh"
+    if [[ ! -f "$script" ]]; then
+        echo "[!] No such profile: $profile" >&2
+        return 1
+    fi
+    bash "$script"
+}
+
+cmd_workspace() {
+    bash "$REPO_DIR/scripts/create-workspace.sh" "$@"
+}
+
+cmd_status() {
+    echo "═══ Lab Status ═══"
+    echo ""
+    printf "Containers:\n"
+    _compose ps 2>/dev/null || echo "  (not running)"
+    echo ""
+    printf "VPN (tun0):\n"
+    if ip addr show tun0 &>/dev/null; then
+        ip -4 addr show tun0 | awk '/inet/{print "  " $2}'
+    else
+        echo "  not connected"
+    fi
+    echo ""
+    printf "GPU:\n"
+    if command -v nvidia-smi &>/dev/null; then
+        nvidia-smi --query-gpu=name,driver_version,memory.total \
+            --format=csv,noheader 2>/dev/null | sed 's/^/  /'
+    else
+        echo "  nvidia-smi not found"
+    fi
+    echo ""
+    printf "Lab root: %s\n" "$LAB_ROOT"
+    if [[ -d "$LAB_ROOT" ]]; then
+        du -sh "$LAB_ROOT" 2>/dev/null | awk '{print "  Disk: " $1}'
+        echo "  Workspaces: $(find "$LAB_ROOT/workspaces" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+    else
+        echo "  (not provisioned — run: sudo labctl bootstrap)"
+    fi
+}
+
+cmd_bootstrap() {
+    if [[ "$(id -u)" -ne 0 ]]; then
+        echo "[!] Requires root.  Run: sudo labctl bootstrap" >&2
+        return 1
+    fi
+    bash "$REPO_DIR/scripts/bootstrap-host.sh"
+}
+
+cmd_verify() {
+    bash "$REPO_DIR/scripts/verify-host.sh" "$@"
+}
+
+cmd_update() {
+    bash "$REPO_DIR/scripts/update-lab.sh" "$@"
+}
+
+cmd_clean() {
+    echo "[!] This removes containers, volumes, and dangling images."
+    echo "    $LAB_ROOT is NOT affected."
+    read -rp "    Proceed? [y/N] " ans
+    if [[ "$ans" =~ ^[Yy]$ ]]; then
+        _compose down -v --remove-orphans
+        docker image prune -f
+        echo "[✓] Cleaned."
+    else
+        echo "    Aborted."
+    fi
+}
+
+cmd_help() {
+    cat <<'HELP'
+labctl — Offensive-security lab control
+
+LIFECYCLE
+  up [--gpu] [--hostnet] [--builder]   Start containers
+  down                                 Stop containers
+  build [--no-cache]                   Build images
+  rebuild                              Build images (no cache)
+  clean                                Remove containers / volumes / prune
+
+INTERACTION
+  shell [container]                    Exec into container (default: kali-main)
+  logs  [container]                    Follow logs
+
+TOOLING
+  sync [-n NAME] [--dry-run]           Sync pinned binaries from manifests/binaries.tsv
+  tmux  <profile>                      Launch a tmux session profile (inside container)
+
+WORKFLOW
+  launch <profile> [target]            Workspace + compose up + kali-main tmux session
+                                       Profiles: default, htb, build, research
+                                       Uses Empusa for workspace init when available
+  workspace <name> [--profile P]       Create workspace via Empusa (htb|build|research|internal)
+                                       Falls back to minimal scaffold without Empusa
+
+OPS
+  status                               Lab health, VPN, GPU, disk
+  verify                               Pre-flight host checks (read-only)
+  update [flags]                       Safe platform update (--pull --empusa --binaries
+                                         --no-build --no-restart --builder --gpu
+                                         --hostnet --force)
+  bootstrap                            One-time host provisioning (sudo)
+  help                                 This message
+
+ENVIRONMENT
+  LAB_ROOT       /opt/lab              Persistent data root
+  LAB_GPU=1                            Stack GPU compose overlay
+  LAB_HOSTNET=1                        Stack host-network compose overlay
+HELP
+}
+
+# ── Dispatch ───────────────────────────────────────────────────────
+main() {
+    local cmd="${1:-help}"
+    shift || true
+    case "$cmd" in
+        up|down|build|rebuild|shell|logs|sync|tmux|launch|workspace|status|verify|update|bootstrap|clean|help)
+            "cmd_$cmd" "$@" ;;
+        -h|--help)
+            cmd_help ;;
+        *)
+            echo "[!] Unknown command: $cmd" >&2
+            cmd_help
+            return 1 ;;
+    esac
+}
+
+main "$@"
