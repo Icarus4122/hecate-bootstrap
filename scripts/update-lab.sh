@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# scripts/update-lab.sh — Safely update the lab platform.
+# scripts/update-lab.sh - Safely update the lab platform.
 #
 # Updates the hecate-bootstrap repo, optionally updates Empusa, rebuilds
 # container images, and optionally refreshes external binaries.
 #
 # /opt/lab runtime data is NEVER touched.  On build failure the running
-# stack is left intact — the operator can continue using the previous
+# stack is left intact - the operator can continue using the previous
 # images until the issue is resolved.
 #
 # Usage:
@@ -120,7 +120,7 @@ step_verify_repo() {
         scripts/verify-host.sh
     )
     for f in "${critical[@]}"; do
-        [[ -f "${REPO_DIR}/${f}" ]] || die "Missing critical file: ${f} — is this the hecate-bootstrap repo?"
+        [[ -f "${REPO_DIR}/${f}" ]] || die "Missing critical file: ${f} - is this the hecate-bootstrap repo?"
     done
     ok "Repo structure intact"
 }
@@ -134,7 +134,7 @@ step_pull() {
     fi
 
     if [[ ! -d "${REPO_DIR}/.git" ]]; then
-        die "Not a git repo — cannot pull"
+        die "Not a git repo - cannot pull"
     fi
 
     local branch
@@ -151,7 +151,7 @@ step_pull() {
         ok "Pulled latest (${branch})"
         _done "git pull (${branch})"
     else
-        die "git pull failed — resolve manually before retrying"
+        die "git pull failed - resolve manually before retrying"
     fi
 }
 
@@ -161,7 +161,7 @@ step_verify_host() {
     if bash "$REPO_DIR/scripts/verify-host.sh"; then
         ok "Host verification passed"
     else
-        die "Host verification failed — fix reported issues before updating"
+        die "Host verification failed - fix reported issues before updating"
     fi
 }
 
@@ -183,7 +183,7 @@ step_empusa() {
         ok "Empusa updated"
         _done "Empusa update"
     else
-        echo "[!] Empusa update failed — continuing (non-fatal)" >&2
+        echo "[!] Empusa update failed - continuing (non-fatal)" >&2
         _failed "Empusa update"
     fi
 }
@@ -206,7 +206,7 @@ step_binaries() {
         ok "Binaries synced"
         _done "Binary sync"
     else
-        echo "[!] Binary sync failed — continuing (non-fatal)" >&2
+        echo "[!] Binary sync failed - continuing (non-fatal)" >&2
         _failed "Binary sync"
     fi
 }
@@ -231,7 +231,7 @@ step_build() {
         _done "Image rebuild"
     else
         _failed "Image rebuild"
-        die "Image rebuild failed — running containers are untouched.
+        die "Image rebuild failed - running containers are untouched.
   Diagnose with:  labctl build
   Existing stack remains operational."
     fi
@@ -251,7 +251,7 @@ step_restart() {
         [[ "$entry" == *"Image rebuild" ]] && [[ "$entry" == "[✓]"* ]] && built=1
     done
     if [[ "$built" == "0" && "$OPT_BUILD" == "1" ]]; then
-        skip "No successful build — skipping restart"
+        skip "No successful build - skipping restart"
         _skipped "Compose restart (no build)"
         return
     fi
@@ -267,7 +267,7 @@ step_restart() {
         _done "Compose restart"
     else
         _failed "Compose restart"
-        echo "[!] Compose restart failed — check: docker compose ps" >&2
+        echo "[!] Compose restart failed - check: docker compose ps" >&2
     fi
 }
 

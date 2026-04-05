@@ -1,4 +1,4 @@
-# Recon — {{TARGET}}
+# Recon - {{TARGET}}
 
 ## Passive
 

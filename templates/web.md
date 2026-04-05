@@ -1,4 +1,4 @@
-# Web — {{URL}}
+# Web - {{URL}}
 
 ## Fingerprint
 

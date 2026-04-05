@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# scripts/sync-binaries.sh — Manifest-driven download of pinned external binaries.
-# Reads manifests/binaries.tsv → writes to ${LAB_ROOT}/tools/binaries/.
+# scripts/sync-binaries.sh - Manifest-driven download of pinned external binaries.
+# Reads manifests/binaries.tsv -> writes to ${LAB_ROOT}/tools/binaries/.
 #
 # Usage:
 #   sync-binaries.sh                    Sync all manifest entries
@@ -8,7 +8,7 @@
 #   sync-binaries.sh --dry-run          Preview without downloading
 #
 # Requires: curl, jq, file
-# Optional: GITHUB_TOKEN env var for higher API rate limits (60 → 5000 req/h)
+# Optional: GITHUB_TOKEN env var for higher API rate limits (60 -> 5000 req/h)
 set -euo pipefail
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -39,7 +39,7 @@ Options:
 
 Environment:
   LAB_ROOT          Base lab directory       (default: /opt/lab)
-  GITHUB_TOKEN      GitHub PAT — raises API rate limit from 60 to 5 000 req/h
+  GITHUB_TOKEN      GitHub PAT - raises API rate limit from 60 to 5 000 req/h
 EOF
     exit 0
 }
@@ -92,7 +92,7 @@ fetch_release() {
     fi
 
     if ! printf '%s' "$json" | jq -e '.assets' &>/dev/null; then
-        echo "    ✗ Unexpected API response — no .assets array" >&2
+        echo "    ✗ Unexpected API response - no .assets array" >&2
         echo "      URL: ${url}" >&2
         return 1
     fi
@@ -109,7 +109,7 @@ validate_download() {
     local ftype
     ftype="$(file -b "$fpath")"
 
-    # HTML is always rejected — strong indicator of a redirect or error page.
+    # HTML is always rejected - strong indicator of a redirect or error page.
     if [[ "$ftype" == *"HTML document"* ]]; then
         echo "    ✗ Rejected: HTML document (download likely returned an error page)"
         echo "      file(1): ${ftype}"
@@ -187,7 +187,7 @@ process_entry() {
 
             if [[ "$mode" == "all-assets" ]]; then
                 # Download every release asset into dest/.
-                # all-assets implies allow-text — checksums and signatures are expected.
+                # all-assets implies allow-text - checksums and signatures are expected.
                 local asset_allow_text=true
 
                 mkdir -p "$target_dir"
@@ -215,14 +215,14 @@ process_entry() {
                             SKIPPED=$((SKIPPED + 1))
                             continue
                         fi
-                        echo "    [~] ${a_name}  size differs — re-downloading"
+                        echo "    [~] ${a_name}  size differs - re-downloading"
                         rm -f "$a_dest"
                     fi
 
                     echo "    [+] ${a_name}  (${a_size} B)"
 
                     if $DRY_RUN; then
-                        echo "        → ${a_dest}"
+                        echo "        -> ${a_dest}"
                         continue
                     fi
 
@@ -234,7 +234,7 @@ process_entry() {
                 done
 
             else
-                # mode = exact asset filename — download that single file.
+                # mode = exact asset filename - download that single file.
                 mkdir -p "$target_dir"
 
                 local a_info
@@ -261,14 +261,14 @@ process_entry() {
                         SKIPPED=$((SKIPPED + 1))
                         return
                     fi
-                    echo "    [~] ${a_name}  size differs — re-downloading"
+                    echo "    [~] ${a_name}  size differs - re-downloading"
                     rm -f "$a_dest"
                 fi
 
                 echo "    [+] ${a_name}  (${a_size} B)"
 
                 if $DRY_RUN; then
-                    echo "        → ${a_dest}"
+                    echo "        -> ${a_dest}"
                     return
                 fi
 
@@ -296,8 +296,8 @@ main() {
 
     $DRY_RUN || mkdir -p "$BIN_DIR"
 
-    echo "[*] Syncing pinned binaries → ${BIN_DIR}"
-    $DRY_RUN && echo "[*] DRY-RUN — no files will be written"
+    echo "[*] Syncing pinned binaries -> ${BIN_DIR}"
+    $DRY_RUN && echo "[*] DRY-RUN - no files will be written"
     echo ""
 
     local matched=0
@@ -332,7 +332,7 @@ main() {
 
     if [[ "$ERRORS" -gt 0 ]]; then
         echo ""
-        echo "[!] ${ERRORS} error(s) — review output above." >&2
+        echo "[!] ${ERRORS} error(s) - review output above." >&2
         exit 1
     fi
 

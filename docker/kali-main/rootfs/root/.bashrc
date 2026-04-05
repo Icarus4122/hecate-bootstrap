@@ -1,4 +1,4 @@
-# ~/.bashrc — kali-main container shell config
+# ~/.bashrc - kali-main container shell config
 
 # ── History ────────────────────────────────────────────────────────
 HISTSIZE=50000
@@ -17,17 +17,17 @@ export PATH
 # ── Environment ────────────────────────────────────────────────────
 export LAB_ROOT="${LAB_ROOT:-/opt/lab}"
 
-# ── Aliases — navigation ──────────────────────────────────────────
+# ── Aliases - navigation ──────────────────────────────────────────
 alias ll='ls -lhA'
 alias la='ls -A'
 alias ..='cd ..'
 alias ...='cd ../..'
 
-# ── Aliases — color ───────────────────────────────────────────────
+# ── Aliases - color ───────────────────────────────────────────────
 alias grep='grep --color=auto'
 alias diff='diff --color=auto'
 
-# ── Aliases — operator ────────────────────────────────────────────
+# ── Aliases - operator ────────────────────────────────────────────
 alias serve='python3 -m http.server 8000'
 alias upload='python3 -m uploadserver 9090'
 alias listen='rlwrap nc -lvnp'

@@ -1,4 +1,4 @@
-# Active Directory — {{DOMAIN}}
+# Active Directory - {{DOMAIN}}
 
 ## Domain Info
 
@@ -43,7 +43,7 @@ certipy find -u USER@{{DOMAIN}} -p PASS -dc-ip <dc>
 ## Attack Path
 
 ```
-→
+->
 ```
 
 ## Notes

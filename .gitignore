@@ -4,7 +4,7 @@
 *.conf.secret
 creds/
 
-# ── Operational artifacts — never version ─────────────────────────
+# ── Operational artifacts - never version ─────────────────────────
 loot/
 screenshots/
 *.pcap

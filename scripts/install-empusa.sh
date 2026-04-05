@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/install-empusa.sh — Install, update, or reinstall Empusa.
+# scripts/install-empusa.sh - Install, update, or reinstall Empusa.
 #
 # Empusa is the workspace / engagement environment manager.
 # Repo:  ${LAB_ROOT}/tools/git/empusa
@@ -24,7 +24,7 @@ Usage: install-empusa.sh <command>
 
 Commands:
   install     Clone the repo (if absent) and create a fresh venv with
-              an editable install. Safe to rerun — skips steps already done.
+              an editable install. Safe to rerun - skips steps already done.
   update      Pull latest changes and re-run the editable install.
   reinstall   Delete the existing venv, recreate it, and reinstall.
               The git repo is preserved.
@@ -61,19 +61,19 @@ ensure_repo() {
         info "Repo already exists: ${REPO_DIR}"
     else
         if [[ -e "$REPO_DIR" ]]; then
-            die "${REPO_DIR} exists but is not a git repo — remove it first"
+            die "${REPO_DIR} exists but is not a git repo - remove it first"
         fi
         info "Cloning ${EMPUSA_REPO_URL}"
         mkdir -p "$(dirname "$REPO_DIR")"
         git clone "$EMPUSA_REPO_URL" "$REPO_DIR"
-        ok "Cloned → ${REPO_DIR}"
+        ok "Cloned -> ${REPO_DIR}"
     fi
 }
 
 # ── Pull latest ───────────────────────────────────────────────────────────────
 pull_repo() {
     if [[ ! -d "${REPO_DIR}/.git" ]]; then
-        die "Repo not found at ${REPO_DIR} — run 'install' first"
+        die "Repo not found at ${REPO_DIR} - run 'install' first"
     fi
     info "Pulling latest changes"
     git -C "$REPO_DIR" pull --ff-only
@@ -112,10 +112,10 @@ pip_install() {
         info "Installing Empusa (editable) from ${REPO_DIR}"
         "$pip" install --quiet --editable "$REPO_DIR"
     elif [[ -f "${REPO_DIR}/requirements.txt" ]]; then
-        info "No pyproject.toml/setup.py found — installing requirements.txt"
+        info "No pyproject.toml/setup.py found - installing requirements.txt"
         "$pip" install --quiet -r "${REPO_DIR}/requirements.txt"
     else
-        info "No Python packaging metadata found — venv created but nothing installed"
+        info "No Python packaging metadata found - venv created but nothing installed"
         info "You can manually install into the venv later"
     fi
 }

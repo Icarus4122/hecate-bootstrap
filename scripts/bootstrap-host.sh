@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/bootstrap-host.sh — One-shot provisioning for Ubuntu 24.04 LTS.
+# scripts/bootstrap-host.sh - One-shot provisioning for Ubuntu 24.04 LTS.
 # Run via: sudo labctl bootstrap
 set -euo pipefail
 
@@ -37,14 +37,14 @@ if ! command -v docker &>/dev/null; then
         docker-buildx-plugin docker-compose-plugin
     systemctl enable --now docker
 else
-    echo "Already installed — $(docker --version)"
+    echo "Already installed - $(docker --version)"
 fi
 
 # 3. Docker group
 banner "3/8  Docker group"
 if ! groups "$REAL_USER" | grep -q '\bdocker\b'; then
     usermod -aG docker "$REAL_USER"
-    echo "Added $REAL_USER — re-login or newgrp docker."
+    echo "Added $REAL_USER - re-login or newgrp docker."
 else
     echo "$REAL_USER already in docker group."
 fi
@@ -54,7 +54,7 @@ banner "4/8  NVIDIA Container Toolkit"
 if command -v nvidia-smi &>/dev/null; then
     bash "$REPO_DIR/scripts/setup-nvidia.sh"
 else
-    echo "nvidia-smi not found — skipping GPU setup."
+    echo "nvidia-smi not found - skipping GPU setup."
 fi
 
 # 5. Persistent lab tree
@@ -66,7 +66,7 @@ chown -R "$REAL_USER":"$REAL_USER" "$LAB_ROOT"
 banner "6/8  .env"
 if [[ ! -f "$REPO_DIR/.env" ]]; then
     cp "$REPO_DIR/.env.example" "$REPO_DIR/.env"
-    echo "Created — review and edit."
+    echo "Created - review and edit."
 else
     echo "Already exists."
 fi
@@ -79,7 +79,7 @@ bash "$REPO_DIR/scripts/install-empusa.sh" install || echo "Empusa install skipp
 banner "8/8  labctl symlink"
 chmod +x "$REPO_DIR/labctl"
 ln -sf "$REPO_DIR/labctl" /usr/local/bin/labctl
-echo "labctl → /usr/local/bin/labctl"
+echo "labctl -> /usr/local/bin/labctl"
 
 echo ""
 echo "╔═══════════════════════════════════════════════════════════╗"

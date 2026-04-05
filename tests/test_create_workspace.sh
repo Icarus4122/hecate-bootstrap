@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_ceate_wokspace.sh — Tests for scripts/create-workspace.sh.
+# tests/test_ceate_wokspace.sh - Tests for scripts/create-workspace.sh.
 #
 # We test the shell fallback path (no Empusa installed) by running
 # the script directly with a sandboxed LAB_ROOT.
@@ -19,11 +19,11 @@ export LAB_ROOT="$SANDBOX/opt/lab"
 mkdir -p "$LAB_ROOT/workspaces"
 
 # Build a minimal PATH that excludes empusa (it may be on the host).
-# The script needs: bash, ls, mkdir, dirname, cd — all in /usr/bin o /bin.
+# The script needs: bash, ls, mkdir, dirname, cd - all in /usr/bin o /bin.
 SAFE_PATH="/usr/bin:/bin"
 
 # ═══════════════════════════════════════════════════════════════════
-#  No arguments → usage (exits 0)
+#  No arguments -> usage (exits 0)
 # ═══════════════════════════════════════════════════════════════════
 c=0
 PATH="$SAFE_PATH" bash "$SCRIPT" > "$OUT" 2>&1 || c=$?
@@ -44,7 +44,7 @@ assert_dir_exists "$LAB_ROOT/workspaces/testbox/logs" "fallback: logs/ created"
 assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
 
 # ═══════════════════════════════════════════════════════════════════
-#  Fallback: workspace already exists → no error
+#  Fallback: workspace already exists -> no error
 # ═══════════════════════════════════════════════════════════════════
 c=0
 PATH="$SAFE_PATH" bash "$SCRIPT" "testbox" > "$OUT" 2>&1 || c=$?

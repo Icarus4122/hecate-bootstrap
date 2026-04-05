@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_launch_lab.sh — Tests for scripts/launch-lab.sh logic.
+# tests/test_launch_lab.sh - Tests for scripts/launch-lab.sh logic.
 #
 # We source launch-lab.sh after stripping the main call and mocking
 # docker to capture compose file stacking and ensure_workspace fallback.
@@ -55,7 +55,7 @@ export -f docker
 # EMPUSA should be "" since we have no binary
 assert_eq "" "$EMPUSA" "ensure_workspace: EMPUSA is empty (no binary)"
 
-# Case 1: workspace does not exist → creates scaffold
+# Case 1: workspace does not exist -> creates scaffold
 ensure_workspace htb "target1" > "$OUT" 2>&1
 assert_dir_exists "$LAB_ROOT/workspaces/target1" "fallback: workspace dir created"
 assert_dir_exists "$LAB_ROOT/workspaces/target1/notes" "fallback: notes/ created"
@@ -64,17 +64,17 @@ assert_dir_exists "$LAB_ROOT/workspaces/target1/loot" "fallback: loot/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/target1/logs" "fallback: logs/ created"
 assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
 
-# Case 2: workspace already exists → skips creation
+# Case 2: workspace already exists -> skips creation
 ensure_workspace htb "target1" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "exists" "fallback: existing workspace detected"
 
 # ═══════════════════════════════════════════════════════════════════
 #  launch_htb: requires target argument
-#  (run in subshell — die() calls exit)
+#  (run in subshell - die() calls exit)
 # ═══════════════════════════════════════════════════════════════════
 rc=0
 ( launch_htb > "$OUT" 2>&1 ) || rc=$?
-assert_eq "1" "$rc" "launch_htb: no target → exit 1"
+assert_eq "1" "$rc" "launch_htb: no target -> exit 1"
 assert_contains "$(cat "$OUT")" "requires a target" "launch_htb: error message mentions target"
 
 # ═══════════════════════════════════════════════════════════════════
@@ -82,7 +82,7 @@ assert_contains "$(cat "$OUT")" "requires a target" "launch_htb: error message m
 # ═══════════════════════════════════════════════════════════════════
 rc=0
 ( main "nonexistent" > "$OUT" 2>&1 ) || rc=$?
-assert_eq "1" "$rc" "dispatch: unknown profile → exit 1"
+assert_eq "1" "$rc" "dispatch: unknown profile -> exit 1"
 assert_contains "$(cat "$OUT")" "Unknown profile" "dispatch: error mentions unknown profile"
 
 end_tests

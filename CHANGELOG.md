@@ -11,8 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Hecate branding (renamed from lab-bootstrap).
 - CI workflow for shell test suite.
 - TAP-style shell test harness with 96 assertions across 6 test files.
-- `update-lab.sh` — safe platform update orchestrator.
-- `verify-host.sh` — read-only pre-flight host checks.
+- `update-lab.sh` - safe platform update orchestrator.
+- `verify-host.sh` - read-only pre-flight host checks.
 - Empusa workspace integration in `launch-lab.sh` and `create-workspace.sh`.
 - Workspace profiles: `htb`, `build`, `research`, `internal`.
 - Binary sync via GitHub Releases API with `file(1)` validation.

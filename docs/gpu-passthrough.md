@@ -1,4 +1,4 @@
-# GPU Passthrough — NVIDIA RTX 2080
+# GPU Passthrough - NVIDIA RTX 2080
 
 ## Prerequisites
 

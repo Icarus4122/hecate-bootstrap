@@ -1,4 +1,4 @@
-# Services — {{TARGET}}
+# Services - {{TARGET}}
 
 ## SMB (445)
 

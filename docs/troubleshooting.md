@@ -21,7 +21,7 @@ informational.
 | Problem | Solution |
 | --------- | ---------- |
 | Permission denied | `sudo usermod -aG docker $USER && newgrp docker` |
-| Daemon unreachable | `sudo systemctl start docker` — `labctl verify` catches this |
+| Daemon unreachable | `sudo systemctl start docker` - `labctl verify` catches this |
 | Can't reach internet from container | `docker network inspect bridge`, check DNS in compose |
 | Can't reach VPN targets | See [vpn-routing.md](vpn-routing.md) |
 | `docker compose` not found | Install compose plugin: `sudo apt install docker-compose-plugin` |
@@ -46,7 +46,7 @@ informational.
 
 ---
 
-## Empusa — Missing / Fallback Mode
+## Empusa - Missing / Fallback Mode
 
 **Symptom:** `[fallback]` prefix in output when running `labctl workspace` or
 `labctl launch`.
@@ -54,7 +54,7 @@ informational.
 **Cause:** Empusa is not installed or the venv binary is not executable.
 
 **Impact:** Workspaces are created with four generic directories (`notes/`,
-`scans/`, `loot/`, `logs/`) — no profile-specific layout, no template
+`scans/`, `loot/`, `logs/`) - no profile-specific layout, no template
 seeding, no workspace metadata, no lifecycle events.  The lab remains
 functional but loses structured engagement support.
 
@@ -102,7 +102,7 @@ labctl verify                   # checks all required directories exist
 ```
 
 All scripts default to `${LAB_ROOT:-/opt/lab}`.  If you override `LAB_ROOT`,
-ensure it is consistent everywhere — exported in your shell profile, set in
+ensure it is consistent everywhere - exported in your shell profile, set in
 `.env`, and passed to `sudo` invocations (`sudo LAB_ROOT=/custom/path labctl bootstrap`).
 
 ---
@@ -111,7 +111,7 @@ ensure it is consistent everywhere — exported in your shell profile, set in
 
 **Symptom:** `labctl build` fails on a missing apt package.
 
-**Cause:** Kali Rolling is a rolling release — package names change over time.
+**Cause:** Kali Rolling is a rolling release - package names change over time.
 
 **Known renames:**
 
@@ -129,7 +129,7 @@ labctl rebuild
 
 ---
 
-## Binary Sync — HTML Download Issues
+## Binary Sync - HTML Download Issues
 
 **Symptom:** `sync-binaries.sh` reports "HTML/XML detected" or downloads are
 rejected after `file(1)` validation.
@@ -140,11 +140,11 @@ binary.  Common reasons:
 | Cause | Fix |
 | ------- | ----- |
 | Wrong release tag in `binaries.tsv` | Check the actual tag on the GitHub releases page |
-| Rate-limited by GitHub API | Set `GITHUB_TOKEN=ghp_xxx` (raises limit from 60 → 5,000 req/hr) |
+| Rate-limited by GitHub API | Set `GITHUB_TOKEN=ghp_xxx` (raises limit from 60 -> 5,000 req/hr) |
 | Asset name mismatch | Run `labctl sync --dry-run` to see available asset names |
 | Repo is private | Ensure `GITHUB_TOKEN` has `repo` scope |
 
-The sync script uses the GitHub Releases API — not HTML scraping — so
+The sync script uses the GitHub Releases API - not HTML scraping - so
 browser-style download URLs will not work in the manifest.
 
 **Debug:**
@@ -158,7 +158,7 @@ GITHUB_TOKEN=ghp_xxx labctl sync       # retry with auth
 
 ## Builder Container
 
-**The builder has no tmux** — by design.  It is a headless cross-compilation
+**The builder has no tmux** - by design.  It is a headless cross-compilation
 environment.  All operator work happens in `kali-main`.
 
 ```bash
@@ -205,7 +205,7 @@ labctl rebuild
 labctl up
 ```
 
-Full reset including `/opt/lab` (destructive — all engagement data lost):
+Full reset including `/opt/lab` (destructive - all engagement data lost):
 
 ```bash
 labctl clean

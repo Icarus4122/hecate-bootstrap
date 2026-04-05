@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_empusa_esolution.sh — Test the 3-step Empusa resolution pattern.
+# tests/test_empusa_esolution.sh - Test the 3-step Empusa resolution pattern.
 #
 # Both launch-lab.sh and create-workspace.sh share ran identical pattern:
 #   1. Check venv binary at ${LAB_ROOT}/tools/venvs/empusa/bin/empusa
@@ -35,7 +35,7 @@ RESOLVE_SCRIPT
 chmod +x "$SANDBOX/resolve.sh"
 
 # ═══════════════════════════════════════════════════════════════════
-#  Case 1: venv binary exists and is executable → uses venv
+#  Case 1: venv binary exists and is executable -> uses venv
 # ═══════════════════════════════════════════════════════════════════
 export LAB_ROOT="$SANDBOX/lab1"
 mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
@@ -47,14 +47,14 @@ chmod +x "$LAB_ROOT/tools/venvs/empusa/bin/empusa"
 
 bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "EMPUSA=$LAB_ROOT/tools/venvs/empusa/bin/empusa" \
-    "venv exists+executable → resolves to venv path"
+    "venv exists+executable -> resolves to venv path"
 
 # ═══════════════════════════════════════════════════════════════════
-#  Case 2: venv missing, empusa on PATH → uses PATH
+#  Case 2: venv missing, empusa on PATH -> uses PATH
 # ═══════════════════════════════════════════════════════════════════
 export LAB_ROOT="$SANDBOX/lab2"
 mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
-# No empusa binary in venv → create a fake one on PATH
+# No empusa binary in venv -> create a fake one on PATH
 mkdir -p "$SANDBOX/fakebin"
 cat > "$SANDBOX/fakebin/empusa" <<'STUB'
 #!/bin/bash
@@ -64,10 +64,10 @@ chmod +x "$SANDBOX/fakebin/empusa"
 
 PATH="$SANDBOX/fakebin:$PATH" bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "EMPUSA=empusa" \
-    "venv missing, PATH has empusa → resolves to 'empusa'"
+    "venv missing, PATH has empusa -> resolves to 'empusa'"
 
 # ═══════════════════════════════════════════════════════════════════
-#  Case 3: venv exists but NOT executable → falls to PATH
+#  Case 3: venv exists but NOT executable -> falls to PATH
 # ═══════════════════════════════════════════════════════════════════
 export LAB_ROOT="$SANDBOX/lab3"
 mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
@@ -76,10 +76,10 @@ echo "not executable" > "$LAB_ROOT/tools/venvs/empusa/bin/empusa"
 
 PATH="$SANDBOX/fakebin:$PATH" bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "EMPUSA=empusa" \
-    "venv not executable, PATH has empusa → resolves to 'empusa'"
+    "venv not executable, PATH has empusa -> resolves to 'empusa'"
 
 # ═══════════════════════════════════════════════════════════════════
-#  Case 4: neither venv no PATH → empty (fallback)
+#  Case 4: neither venv no PATH -> empty (fallback)
 # ═══════════════════════════════════════════════════════════════════
 export LAB_ROOT="$SANDBOX/lab4"
 mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
@@ -88,7 +88,7 @@ mkdir -p "$LAB_ROOT/tools/venvs/empusa/bin"
 # Use a minimal PATH that excludes any empusa binary
 PATH="/usr/bin:/bin" bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
 assert_eq "EMPUSA=" "$(cat "$OUT" | tr -d '\\n')" \
-    "neither venv no PATH → EMPUSA is empty"
+    "neither venv no PATH -> EMPUSA is empty"
 
 # ═══════════════════════════════════════════════════════════════════
 #  Case 5: venv wins over PATH (priority order)
@@ -104,6 +104,6 @@ chmod +x "$LAB_ROOT/tools/venvs/empusa/bin/empusa"
 # Also have empusa on PATH
 PATH="$SANDBOX/fakebin:$PATH" bash "$SANDBOX/resolve.sh" > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "EMPUSA=$LAB_ROOT/tools/venvs/empusa/bin/empusa" \
-    "venv + PATH both available → venv wins"
+    "venv + PATH both available -> venv wins"
 
 end_tests

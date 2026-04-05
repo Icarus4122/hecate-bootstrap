@@ -1,8 +1,8 @@
-# compose/docker-compose.yml — Base stack (bridge network).
+# compose/docker-compose.yml - Base stack (bridge network).
 #
 # Override files stacked by labctl:
-#   --gpu      → docker-compose.gpu.yml
-#   --hostnet  → docker-compose.hostnet.yml
+#   --gpu      -> docker-compose.gpu.yml
+#   --hostnet  -> docker-compose.hostnet.yml
 
 services:
   kali-main:

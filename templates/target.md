@@ -1,4 +1,4 @@
-# Target — {{IP}}
+# Target - {{IP}}
 
 | Field    | Value  |
 |----------|--------|
@@ -28,7 +28,7 @@
 ## Attack Path
 
 ```
-→
+->
 ```
 
 ## Notes

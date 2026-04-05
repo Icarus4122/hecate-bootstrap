@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_compose_lib.sh — Tests for scripts/lib/compose.sh shared helper.
+# tests/test_compose_lib.sh - Tests for scripts/lib/compose.sh shared helper.
 set -euo pipefail
 
 TESTS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

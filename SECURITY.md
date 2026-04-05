@@ -22,7 +22,7 @@ will be prioritized based on severity.
 
 ## Scope
 
-Hecate is an operator workstation bootstrap — it provisions hosts, builds
+Hecate is an operator workstation bootstrap - it provisions hosts, builds
 Docker images, and manages tooling.  Vulnerabilities of interest include:
 
 - Privilege escalation via `labctl` or bootstrap scripts

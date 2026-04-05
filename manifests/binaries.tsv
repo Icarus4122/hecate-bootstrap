@@ -1,4 +1,4 @@
-# manifests/binaries.tsv — Pinned external binaries.
+# manifests/binaries.tsv - Pinned external binaries.
 # Tab-separated: name  type  repo  tag  mode  dest  flags
 #
 # Columns:

@@ -1,8 +1,8 @@
-# apt-packages.txt — Build / cross-compile / packaging packages.
+# apt-packages.txt - Build / cross-compile / packaging packages.
 # Consumed by: docker/builder/Dockerfile (Ubuntu 24.04 base)
 #
 # Policy:
-#   - Build and helper tooling only — not daily operator tools
+#   - Build and helper tooling only - not daily operator tools
 #   - No nmap, ffuf, gobuster, responder, impacket-scripts, evil-winrm
 #   - No GUI desktop packages
 #   - No baked-in payload artifacts

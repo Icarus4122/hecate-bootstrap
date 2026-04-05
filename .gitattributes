@@ -1,7 +1,7 @@
 # Auto-detect text files and normalise line endings
 * text=auto
 
-# Shell / config — always LF
+# Shell / config - always LF
 *.sh text eol=lf
 labctl text eol=lf
 .tmux.conf text eol=lf
@@ -21,6 +21,6 @@ labctl text eol=lf
 # Dockerfile
 Dockerfile text
 
-# Binary — do not diff
+# Binary - do not diff
 *.png binary
 *.jpg binary

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/setup-nvidia.sh — Install/verify NVIDIA Container Toolkit.
+# scripts/setup-nvidia.sh - Install/verify NVIDIA Container Toolkit.
 # Called by bootstrap-host.sh when nvidia-smi is present.
 set -euo pipefail
 

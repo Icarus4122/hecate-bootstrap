@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/helpers.sh — Minimal TAP-style test harness for hecate-bootstrap scripts.
+# tests/helpers.sh - Minimal TAP-style test harness for hecate-bootstrap scripts.
 #
 # Source this file in each test script.  Usage:
 #

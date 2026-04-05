@@ -1,4 +1,4 @@
-# compose/docker-compose.hostnet.yml — Host-network overlay.
+# compose/docker-compose.hostnet.yml - Host-network overlay.
 # Stacked when: labctl up --hostnet   (or LAB_HOSTNET=1)
 # Gives containers direct access to tun0 (VPN).
 

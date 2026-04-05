@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/launch-lab.sh — Launch the lab for a given profile and optional target.
+# scripts/launch-lab.sh - Launch the lab for a given profile and optional target.
 #
 # Authoritative implementation of launch behavior.  labctl delegates here.
 # Handles: workspace creation, compose bring-up, container entry, tmux profile.
@@ -24,7 +24,7 @@ Usage: launch-lab.sh <profile> [target]
 
 Profiles:
   default              General-purpose operator session in kali-main
-  htb <target>         HTB engagement — creates workspace, enters kali-main
+  htb <target>         HTB engagement - creates workspace, enters kali-main
   build [name]         Build/compile session in kali-main (builder sidecar started)
   research [topic]     Research session in kali-main
 
@@ -32,7 +32,7 @@ All profiles run their tmux layout inside the kali-main container.
 The `build` profile additionally starts the builder sidecar service,
 which can be reached from kali-main via `docker exec` or the shared
 /opt/lab/tools mount.  The builder itself has no tmux or operator
-tooling — it is a headless cross-compilation environment.
+tooling - it is a headless cross-compilation environment.
 
 Environment:
   LAB_ROOT             Persistent data root       (default: /opt/lab)
@@ -84,7 +84,7 @@ ensure_workspace() {
             --templates-dir "$REPO_DIR/templates" \
             --set-active
     else
-        info "[fallback] Empusa not found — creating generic workspace."
+        info "[fallback] Empusa not found - creating generic workspace."
         mkdir -p "$WORKSPACE_PATH"/{notes,scans,loot,logs}
         info "[fallback] Created ${WORKSPACE_PATH} (install Empusa for full '${profile}' support)"
     fi
@@ -100,10 +100,10 @@ ensure_up() {
 }
 
 # Exec into kali-main and run a tmux profile.
-# All profiles enter kali-main — it has the operator tooling + tmux config.
+# All profiles enter kali-main - it has the operator tooling + tmux config.
 enter_kali() {
     local profile_script="$1"; shift
-    info "Entering kali-main → ${profile_script%.sh}"
+    info "Entering kali-main -> ${profile_script%.sh}"
     _compose exec kali-main bash "/etc/tmux.d/profiles/${profile_script}" "$@"
 }
 
@@ -128,7 +128,7 @@ launch_htb() {
 
 # ── Profile: build ────────────────────────────────────────────────────────────
 # The operator works inside kali-main.  The builder sidecar is started alongside
-# for cross-compilation tasks — it shares /opt/lab/tools via bind mounts.
+# for cross-compilation tasks - it shares /opt/lab/tools via bind mounts.
 # The builder has no tmux, no operator tooling; use `docker exec lab-builder`
 # from the host or kali-main if you need a shell in the builder directly.
 launch_build() {

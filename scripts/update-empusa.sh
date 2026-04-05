@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/update-empusa.sh — Pull latest Empusa and reinstall.
+# scripts/update-empusa.sh - Pull latest Empusa and reinstall.
 # Delegates to install-empusa.sh update.
 set -euo pipefail
 

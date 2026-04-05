@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tmux/profiles/research.sh — Research / learning layout.
+# tmux/profiles/research.sh - Research / learning layout.
 # Usage: research.sh [workspace-o-topic-path]
 # Windows: research, notes
 set -euo pipefail

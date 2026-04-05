@@ -1,4 +1,4 @@
-# pipx-packages.txt — Python tools installed via pipx in kali-main.
+# pipx-packages.txt - Python tools installed via pipx in kali-main.
 # Consumed by: docker/kali-main/Dockerfile
 #
 # Keep short.  Do not duplicate tools already installed via apt

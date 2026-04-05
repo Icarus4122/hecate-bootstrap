@@ -2,7 +2,7 @@
 
 `labctl` is a thin dispatcher.  Each subcommand maps to a function or a
 script under `scripts/`.  It owns compose-file stacking, environment wiring,
-and flag parsing — business logic lives in the scripts.
+and flag parsing - business logic lives in the scripts.
 
 ## Lifecycle
 
@@ -32,7 +32,7 @@ and flag parsing — business logic lives in the scripts.
 
 | Command | Description |
 | --------- | ------------- |
-| `labctl launch <profile> [target]` | Full launch: workspace creation (Empusa or fallback) → compose up → kali-main tmux session.  Profiles: `default`, `htb`, `build`, `research`.  The `build` profile also starts the builder sidecar. |
+| `labctl launch <profile> [target]` | Full launch: workspace creation (Empusa or fallback) -> compose up -> kali-main tmux session.  Profiles: `default`, `htb`, `build`, `research`.  The `build` profile also starts the builder sidecar. |
 | `labctl workspace <name> [--profile P]` | Create workspace via Empusa (profiles: `htb`, `build`, `research`, `internal`).  Falls back to minimal scaffold (`notes/`, `scans/`, `loot/`, `logs/`) without Empusa. |
 
 ## Ops
@@ -69,14 +69,14 @@ On build failure, running containers are left intact.  `/opt/lab` is never modif
 | `LAB_GPU` | `0\|1` | `0` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Stack GPU compose overlay |
 | `LAB_HOSTNET` | `0\|1` | `0` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Stack host-network compose overlay |
 | `COMPOSE_PROJECT_NAME` | string | `lab` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Docker Compose project name |
-| `GITHUB_TOKEN` | string | *(unset)* | `sync-binaries.sh` | GitHub PAT — raises API rate limit from 60 → 5,000 req/hr |
+| `GITHUB_TOKEN` | string | *(unset)* | `sync-binaries.sh` | GitHub PAT - raises API rate limit from 60 -> 5,000 req/hr |
 | `EMPUSA_REPO` | URL | *(see default)* | `install-empusa.sh` | Empusa clone URL (default: `https://github.com/Icarus4122/empusa.git`) |
 
 ## Compose Stacking
 
 ```bash
 labctl up --gpu --hostnet --builder
-  →  docker compose \
+  ->  docker compose \
        -f compose/docker-compose.yml \
        -f compose/docker-compose.gpu.yml \
        -f compose/docker-compose.hostnet.yml \

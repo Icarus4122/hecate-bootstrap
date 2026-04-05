@@ -1,4 +1,4 @@
-# compose/docker-compose.gpu.yml — NVIDIA GPU passthrough overlay.
+# compose/docker-compose.gpu.yml - NVIDIA GPU passthrough overlay.
 # Stacked when: labctl up --gpu   (or LAB_GPU=1)
 # Requires: nvidia-container-toolkit on the host.
 

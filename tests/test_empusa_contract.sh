@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_empusa_contract.sh — Cross-repo workspace contract validation.
+# tests/test_empusa_contract.sh - Cross-repo workspace contract validation.
 #
 # Validates that Hecate's integration assumptions match the real Empusa
 # workspace module.  Source of truth: empusa/workspace.py
@@ -187,7 +187,7 @@ for p in htb build research internal; do
 done
 
 # ═══════════════════════════════════════════════════════════════════
-#  3. Idempotency — re-creating existing workspace
+#  3. Idempotency - re-creating existing workspace
 # ═══════════════════════════════════════════════════════════════════
 
 already=$(_pyrun "
@@ -203,7 +203,7 @@ assert_eq "True" "$already" \
 #  4. Template availability in Hecate repo
 # ═══════════════════════════════════════════════════════════════════
 # Every template referenced by any Empusa profile must exist in
-# hecate-bootstrap/templates/ — otherwise workspace creation would
+# hecate-bootstrap/templates/ - otherwise workspace creation would
 # report templates_missing.
 
 ALL_TPL=$(_pyrun "

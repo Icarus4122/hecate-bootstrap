@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tmux/profiles/default.sh — General-purpose operator layout.
+# tmux/profiles/default.sh - General-purpose operator layout.
 # Windows: main, ops
 set -euo pipefail
 

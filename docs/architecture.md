@@ -37,7 +37,7 @@ flowchart TB
 | SHA-256 binary sync | Reproducible, verifiable, keeps large files out of git. |
 | Empusa as preferred orchestrator | Empusa handles workspace creation, template seeding, session state, and event emission.  A minimal shell fallback (4 generic directories, no profiles, no templates) provides compatibility when Empusa is not installed. |
 | `docker/*/rootfs/` pattern | Files under rootfs/ are COPY'd into the image root, keeping shell configs versionable without layering complexity. |
-| Containers disposable | `labctl clean` is safe — /opt/lab is never touched. |
+| Containers disposable | `labctl clean` is safe - /opt/lab is never touched. |
 | `verify-host.sh` before update | `update-lab.sh` runs pre-flight verification to catch drift before rebuilding. |
 | Shell test suite | `tests/` exercises script logic (flag parsing, workspace scaffolding, compose stacking, Empusa resolution) in sandboxed environments.  Docker/network/GPU paths are verified manually via `labctl verify`. |
 

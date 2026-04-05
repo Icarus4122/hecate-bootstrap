@@ -8,10 +8,10 @@
 
 **Dockerized operator platform and workstation bootstrap for terminal-first security operations.**
 
-> Platform layer for [Empusa](https://github.com/Icarus4122/empusa) — *"the crossroads daemon."*
+> Platform layer for [Empusa](https://github.com/Icarus4122/empusa) - *"the crossroads daemon."*
 
 Hecate bootstraps a dedicated offensive-security workstation from a fresh Ubuntu 24.04 install.
-Everything runs in Docker — a Kali Rolling container for daily operator work, and an
+Everything runs in Docker - a Kali Rolling container for daily operator work, and an
 optional Ubuntu builder sidecar for cross-compilation.  Persistent operational data lives
 on the host at `/opt/lab` and survives container rebuilds.
 
@@ -100,51 +100,51 @@ Compose overlays control optional features:
 
 ```text
 hecate-bootstrap/
-├── labctl                          → thin command dispatcher
-├── .env.example                    → config template (never commit .env)
+├── labctl                          -> thin command dispatcher
+├── .env.example                    -> config template (never commit .env)
 ├── .gitignore
 ├── README.md
 │
 ├── compose/
-│   ├── docker-compose.yml          → base stack (bridge, kali-main + builder)
-│   ├── docker-compose.gpu.yml      → NVIDIA GPU overlay
-│   └── docker-compose.hostnet.yml  → host-network overlay
+│   ├── docker-compose.yml          -> base stack (bridge, kali-main + builder)
+│   ├── docker-compose.gpu.yml      -> NVIDIA GPU overlay
+│   └── docker-compose.hostnet.yml  -> host-network overlay
 │
 ├── docker/
 │   ├── kali-main/
-│   │   ├── Dockerfile              → Kali Rolling CLI image
-│   │   ├── apt-packages.txt        → operator apt packages (~55 packages)
-│   │   ├── pipx-packages.txt       → pipx tools (uploadserver)
+│   │   ├── Dockerfile              -> Kali Rolling CLI image
+│   │   ├── apt-packages.txt        -> operator apt packages (~55 packages)
+│   │   ├── pipx-packages.txt       -> pipx tools (uploadserver)
 │   │   └── rootfs/
-│   │       └── root/.bashrc        → shell config, aliases, PATH
+│   │       └── root/.bashrc        -> shell config, aliases, PATH
 │   └── builder/
-│       ├── Dockerfile              → Ubuntu 24.04 cross-compilation image
-│       └── apt-packages.txt        → build toolchain packages
+│       ├── Dockerfile              -> Ubuntu 24.04 cross-compilation image
+│       └── apt-packages.txt        -> build toolchain packages
 │
 ├── scripts/
-│   ├── bootstrap-host.sh           → one-time host provisioning (8 steps)
-│   ├── launch-lab.sh               → profile-aware lab launch (authoritative)
-│   ├── verify-host.sh              → pre-flight host readiness checks
-│   ├── update-lab.sh               → safe platform update orchestrator
-│   ├── sync-binaries.sh            → GitHub API-driven binary download + verify
-│   ├── create-workspace.sh         → engagement workspace scaffolding
-│   ├── install-empusa.sh           → Empusa install / update / reinstall
-│   ├── update-empusa.sh            → delegates to install-empusa.sh update
-│   └── setup-nvidia.sh             → NVIDIA container toolkit installer
+│   ├── bootstrap-host.sh           -> one-time host provisioning (8 steps)
+│   ├── launch-lab.sh               -> profile-aware lab launch (authoritative)
+│   ├── verify-host.sh              -> pre-flight host readiness checks
+│   ├── update-lab.sh               -> safe platform update orchestrator
+│   ├── sync-binaries.sh            -> GitHub API-driven binary download + verify
+│   ├── create-workspace.sh         -> engagement workspace scaffolding
+│   ├── install-empusa.sh           -> Empusa install / update / reinstall
+│   ├── update-empusa.sh            -> delegates to install-empusa.sh update
+│   └── setup-nvidia.sh             -> NVIDIA container toolkit installer
 │
 ├── tmux/
-│   ├── .tmux.conf                  → base config (bind-mounted into containers)
+│   ├── .tmux.conf                  -> base config (bind-mounted into containers)
 │   └── profiles/
-│       ├── default.sh              → 2 windows: main, ops
-│       ├── htb.sh                  → 2 windows: main, ops (workspace arg required)
-│       ├── build.sh                → 2 windows: build, tools
-│       └── research.sh             → 2 windows: research, notes
+│       ├── default.sh              -> 2 windows: main, ops
+│       ├── htb.sh                  -> 2 windows: main, ops (workspace arg required)
+│       ├── build.sh                -> 2 windows: build, tools
+│       └── research.sh             -> 2 windows: research, notes
 │
 ├── manifests/
-│   ├── apt-host.txt                → host apt packages for bootstrap
-│   └── binaries.tsv                → pinned binary manifest (TSV, 7 columns)
+│   ├── apt-host.txt                -> host apt packages for bootstrap
+│   └── binaries.tsv                -> pinned binary manifest (TSV, 7 columns)
 │
-├── templates/                      → markdown engagement/methodology templates
+├── templates/                      -> markdown engagement/methodology templates
 │   ├── engagement.md               target.md    recon.md
 │   ├── services.md                 web.md       privesc.md
 │   ├── pivot.md                    ad.md        finding.md
@@ -161,18 +161,18 @@ All operational data lives on the host at `/opt/lab` and is bind-mounted into co
 
 ```text
 /opt/lab/
-├── data/             → scan output, loot, engagement artifacts
+├── data/             -> scan output, loot, engagement artifacts
 ├── tools/
-│   ├── binaries/     → synced external binaries (chisel, ligolo, …)
-│   ├── git/          → cloned tool repos (Empusa, …)
-│   └── venvs/        → isolated Python venvs (Empusa, …)
-├── resources/        → staged transfer files, payloads
-├── workspaces/       → engagement directories
-│   ├── htb/<target>/ → per-target HTB workspaces
-│   ├── build/<name>/ → per-project build workspaces
-│   └── research/     → research topics
-├── knowledge/        → reference material, notes
-└── templates/        → seeded report templates
+│   ├── binaries/     -> synced external binaries (chisel, ligolo, …)
+│   ├── git/          -> cloned tool repos (Empusa, …)
+│   └── venvs/        -> isolated Python venvs (Empusa, …)
+├── resources/        -> staged transfer files, payloads
+├── workspaces/       -> engagement directories
+│   ├── htb/<target>/ -> per-target HTB workspaces
+│   ├── build/<name>/ -> per-project build workspaces
+│   └── research/     -> research topics
+├── knowledge/        -> reference material, notes
+└── templates/        -> seeded report templates
 ```
 
 This directory survives `labctl clean` and container rebuilds.
@@ -250,7 +250,7 @@ labctl launch build               # defaults to /opt/lab/tools
 
 Starts both `kali-main` and the `builder` sidecar.  The operator works inside `kali-main`
 with the build tmux profile.  The `builder` service is a headless Ubuntu environment for
-cross-compilation — it shares `/opt/lab/tools` and can be reached via `labctl shell builder`.
+cross-compilation - it shares `/opt/lab/tools` and can be reached via `labctl shell builder`.
 
 ### research
 
@@ -285,7 +285,7 @@ bash /etc/tmux.d/profiles/htb.sh /opt/lab/workspaces/htb/mybox
 ## Binary Sync
 
 Pinned external binaries are defined in `manifests/binaries.tsv` and downloaded via the
-GitHub Releases API — not by scraping HTML download links.
+GitHub Releases API - not by scraping HTML download links.
 
 ```bash
 labctl sync                       # sync all entries
@@ -320,7 +320,7 @@ Manifest format (TSV, 7 columns):
 Empusa is the preferred workspace orchestrator.  When installed, `labctl workspace`,
 `labctl launch`, and `create-workspace.sh` all delegate workspace creation, template
 seeding, and session activation to Empusa.  A minimal shell fallback exists for
-environments where Empusa is not yet installed — it creates four generic directories
+environments where Empusa is not yet installed - it creates four generic directories
 (`notes/`, `scans/`, `loot/`, `logs/`) with no profile-specific layout, no templates,
 and no event emission.
 
@@ -366,7 +366,7 @@ LAB_HOSTNET=1 labctl up
 ```
 
 Switches containers to `network_mode: host`.  The container shares the host network
-stack, including `tun0` — useful when the VPN is running on the host and you need
+stack, including `tun0` - useful when the VPN is running on the host and you need
 direct access from inside the container without NAT.
 
 VPN always runs on the host, never inside containers.
@@ -427,7 +427,7 @@ For full flag documentation, see [docs/labctl.md](docs/labctl.md).
 | `LAB_GPU` | `0\|1` | `0` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Stack GPU compose overlay |
 | `LAB_HOSTNET` | `0\|1` | `0` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Stack host-network compose overlay |
 | `COMPOSE_PROJECT_NAME` | string | `lab` | `labctl`, `launch-lab.sh`, `update-lab.sh` | Docker Compose project name |
-| `GITHUB_TOKEN` | string | *(unset)* | `sync-binaries.sh` | GitHub PAT — raises API rate limit from 60 → 5,000 req/hr |
+| `GITHUB_TOKEN` | string | *(unset)* | `sync-binaries.sh` | GitHub PAT - raises API rate limit from 60 -> 5,000 req/hr |
 | `EMPUSA_REPO` | URL | `https://github.com/Icarus4122/empusa.git` | `install-empusa.sh` | Empusa clone URL |
 
 ## Host Verification
@@ -495,7 +495,7 @@ CI runs the same suite on every push and PR to `main`.
 | `create-workspace.sh` | Usage output, fallback scaffold directories, idempotency, `--profile` flag |
 | `update-lab.sh` | `parse_flags` (all 9 flags + unknown), `step_verify_repo`, summary tracking (`_done`/`_skipped`/`_failed`), `step_summary` failure detection, skip-by-default |
 | `sync-binaries.sh` | `validate_download` (ELF / HTML / XML / text / gzip), argument parsing (gated on `jq` availability) |
-| Empusa resolution | 3-step resolution order (venv → PATH → fallback), priority when both exist |
+| Empusa resolution | 3-step resolution order (venv -> PATH -> fallback), priority when both exist |
 
 ### What requires manual verification
 

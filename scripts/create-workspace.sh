@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# scripts/create-workspace.sh — Create an engagement workspace directory.
+# scripts/create-workspace.sh - Create an engagement workspace directory.
 #
 # Delegation order:
 #   1. Empusa venv at ${LAB_ROOT}/tools/venvs/empusa/bin/empusa
 #   2. Empusa on PATH (`empusa`)
-#   3. Shell fallback (minimal scaffold — no profile-specific logic)
+#   3. Shell fallback (minimal scaffold - no profile-specific logic)
 #
 # Called by: labctl workspace <name> [--profile P]
 set -euo pipefail
@@ -60,7 +60,7 @@ fi
 # bare workspace directory with no profile-specific subdirectories,
 # no template seeding, and no event emission.  Install Empusa for
 # full workspace support.
-echo "[fallback] Empusa not found — creating minimal workspace."
+echo "[fallback] Empusa not found - creating minimal workspace."
 
 ws="$LAB_ROOT/workspaces/$name"
 if [[ -d "$ws" ]]; then
@@ -69,4 +69,4 @@ if [[ -d "$ws" ]]; then
 fi
 
 mkdir -p "$ws"/{notes,scans,loot,logs}
-echo "[fallback] Created $ws (generic layout — install Empusa for profile '${profile}' support)"
+echo "[fallback] Created $ws (generic layout - install Empusa for profile '${profile}' support)"

@@ -1,4 +1,4 @@
-# Privilege Escalation — {{TARGET}}
+# Privilege Escalation - {{TARGET}}
 
 ## Current Access
 
@@ -47,7 +47,7 @@ systeminfo
 ## Escalation Path
 
 ```
-→
+->
 ```
 
 ## Notes

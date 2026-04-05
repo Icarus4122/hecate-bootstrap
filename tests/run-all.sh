@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/run-all.sh — Run every test_*.sh file under tests/.
+# tests/run-all.sh - Run every test_*.sh file under tests/.
 #
 # Usage:
 #   bash tests/run-all.sh

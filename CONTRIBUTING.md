@@ -16,7 +16,7 @@ Thanks for your interest in Hecate! Here is how you can help.
 
    | Area | Path | Purpose |
    | ---- | ---- | ------- |
-   | Dispatcher | `labctl` | Thin command router — all subcommands dispatch to `scripts/` |
+   | Dispatcher | `labctl` | Thin command router - all subcommands dispatch to `scripts/` |
    | Bootstrap | `scripts/bootstrap-host.sh` | One-time host setup |
    | Compose | `compose/` | Container definitions and overlays |
    | Images | `docker/` | Dockerfiles and rootfs layers |
@@ -36,7 +36,7 @@ Thanks for your interest in Hecate! Here is how you can help.
 
 ## Code Style
 
-- **Bash** — all scripts target Bash 5.x with `set -euo pipefail`.
+- **Bash** - all scripts target Bash 5.x with `set -euo pipefail`.
 - Use `"$var"` quoting everywhere.  No unquoted expansions.
 - Use `[[ ]]` for conditionals, not `[ ]`.
 - Keep functions short.  If a function exceeds ~40 lines, extract a helper.
@@ -48,7 +48,7 @@ Thanks for your interest in Hecate! Here is how you can help.
 
 These rules apply to all markdown files in both Empusa and Hecate.
 Contract docs (`docs/empusa.md`, profile tables, env-var tables) **must** stay
-aligned with source code and test assertions — update them in the same commit.
+aligned with source code and test assertions - update them in the same commit.
 
 ### Badges
 
@@ -59,8 +59,8 @@ aligned with source code and test assertions — update them in the same commit.
 ### Mermaid diagrams
 
 - Use only for: architecture boundaries, lifecycle flows, dispatch graphs, topology.
-- Do **not** use FA icons (`fa:fa-*`) — they don't render on GitHub.
-- Do **not** add `classDef` / `class` blocks — GitHub ignores custom styles.
+- Do **not** use FA icons (`fa:fa-*`) - they don't render on GitHub.
+- Do **not** add `classDef` / `class` blocks - GitHub ignores custom styles.
 - Keep nodes ≤ 2 lines of text.  If a node needs 3+ lines, it belongs in a table.
 - Node IDs should map to real files or components (`BUS`, `LABCTL`, not `box1`).
 
@@ -83,7 +83,7 @@ Example (env var):
 
 - Always tag the language: `` ```bash ``, `` ```python ``, `` ```text ``.
 - Use `text` for static output, directory trees, and non-executable content.
-- Separate commands from their output — don't paste both in one fence.
+- Separate commands from their output - don't paste both in one fence.
 
 ### Paths
 
@@ -103,9 +103,9 @@ Example (env var):
 
 ### Source-of-truth discipline
 
-- Profile definitions (dirs, templates) → `empusa/workspace.py → PROFILES`.
-- Template files → `hecate-bootstrap/templates/*.md`.
-- Delegation logic → `hecate-bootstrap/scripts/create-workspace.sh`, `launch-lab.sh`.
+- Profile definitions (dirs, templates) -> `empusa/workspace.py -> PROFILES`.
+- Template files -> `hecate-bootstrap/templates/*.md`.
+- Delegation logic -> `hecate-bootstrap/scripts/create-workspace.sh`, `launch-lab.sh`.
 - If you change a contract surface, update the matching doc table **and** the
   test assertion in the same PR.
 

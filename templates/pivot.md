@@ -1,4 +1,4 @@
-# Pivot — {{SOURCE}} → {{DESTINATION}}
+# Pivot - {{SOURCE}} -> {{DESTINATION}}
 
 ## Network Position
 

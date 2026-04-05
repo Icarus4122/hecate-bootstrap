@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tmux/profiles/build.sh — Builder / compilation layout.
+# tmux/profiles/build.sh - Builder / compilation layout.
 # Usage: build.sh [workspace-path]
 # Windows: build, tools
 set -euo pipefail

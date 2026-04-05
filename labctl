@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# labctl — Top-level control surface for the offensive-security lab.
+# labctl - Top-level control surface for the offensive-security lab.
 #
 # This is a thin dispatcher.  Each subcommand maps to a function below
 # or to a script under scripts/.  Compose file stacking, profile
@@ -118,7 +118,7 @@ cmd_status() {
         du -sh "$LAB_ROOT" 2>/dev/null | awk '{print "  Disk: " $1}'
         echo "  Workspaces: $(find "$LAB_ROOT/workspaces" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
     else
-        echo "  (not provisioned — run: sudo labctl bootstrap)"
+        echo "  (not provisioned - run: sudo labctl bootstrap)"
     fi
 }
 
@@ -153,7 +153,7 @@ cmd_clean() {
 
 cmd_help() {
     cat <<'HELP'
-labctl — Offensive-security lab control
+labctl - Offensive-security lab control
 
 LIFECYCLE
   up [--gpu] [--hostnet] [--builder]   Start containers

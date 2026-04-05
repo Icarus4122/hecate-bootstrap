@@ -1,4 +1,4 @@
-# Ubuntu 24.04 — matches the host OS, gives access to the full
+# Ubuntu 24.04 - matches the host OS, gives access to the full
 # Ubuntu package ecosystem for native and cross-compilation toolchains
 # without pulling in the larger Kali metapackage surface.
 FROM ubuntu:24.04

@@ -1,8 +1,8 @@
-# apt-packages.txt — Kali operator packages for kali-main.
+# apt-packages.txt - Kali operator packages for kali-main.
 # Consumed by: docker/kali-main/Dockerfile
 #
 # Policy:
-#   - CLI only — no GUI / desktop packages
+#   - CLI only - no GUI / desktop packages
 #   - No heavy build-chain tools (use the builder image)
 #   - No mingw-w64, wine, veil, or baked-in payload artifacts
 

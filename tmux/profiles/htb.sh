@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# tmux/profiles/htb.sh — Hack The Box focused layout.
+# tmux/profiles/htb.sh - Hack The Box focused layout.
 # Usage: htb.sh <workspace-path>
-# Windows: main, ops — both cd into the workspace.
+# Windows: main, ops - both cd into the workspace.
 set -euo pipefail
 
 if [[ -z "${1:-}" ]]; then
