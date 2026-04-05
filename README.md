@@ -167,10 +167,8 @@ All operational data lives on the host at `/opt/lab` and is bind-mounted into co
 │   ├── git/          -> cloned tool repos (Empusa, …)
 │   └── venvs/        -> isolated Python venvs (Empusa, …)
 ├── resources/        -> staged transfer files, payloads
-├── workspaces/       -> engagement directories
-│   ├── htb/<target>/ -> per-target HTB workspaces
-│   ├── build/<name>/ -> per-project build workspaces
-│   └── research/     -> research topics
+├── workspaces/       -> engagement directories (flat; profile in metadata)
+│   └── <name>/       -> profiled workspace (notes, scans, loot, …)
 ├── knowledge/        -> reference material, notes
 └── templates/        -> seeded report templates
 ```
@@ -235,7 +233,7 @@ General-purpose session.  Two tmux windows (`main`, `ops`) starting at `/opt/lab
 labctl launch htb resolute
 ```
 
-Creates `/opt/lab/workspaces/htb/resolute/` with subdirectories:
+Creates `/opt/lab/workspaces/resolute/` with subdirectories:
 `notes/`, `scans/`, `web/`, `creds/`, `loot/`, `exploits/`, `screenshots/`, `reports/`, `logs/`.
 
 Enters `kali-main` with the htb tmux profile.  Both windows start in the workspace.
@@ -259,7 +257,7 @@ labctl launch research cve-2024-1234
 labctl launch research
 ```
 
-Creates a topic directory under `/opt/lab/workspaces/research/` if a topic is given.
+Creates `/opt/lab/workspaces/<topic>/` if a topic is given.
 Two tmux windows (`research`, `notes`).
 
 ## tmux
@@ -279,7 +277,7 @@ To use profiles directly (inside the container):
 
 ```bash
 bash /etc/tmux.d/profiles/default.sh
-bash /etc/tmux.d/profiles/htb.sh /opt/lab/workspaces/htb/mybox
+bash /etc/tmux.d/profiles/htb.sh /opt/lab/workspaces/mybox
 ```
 
 ## Binary Sync

@@ -55,7 +55,7 @@ flowchart LR
 | Workspace profile definitions | **Empusa** | `empusa/workspace.py -> PROFILES` |
 | Directory scaffold + template seeding | **Empusa** | `create_workspace()` |
 | Metadata file (`.empusa-workspace.json`) | **Empusa** | Written at workspace root |
-| Lifecycle events | **Empusa** | `workspace.created`, `workspace.activated` via event bus |
+| Lifecycle events | **Empusa** | `pre_workspace_init`, `post_workspace_init`, `on_workspace_select` via event bus |
 | Session state | **Empusa** | Active workspace tracking |
 
 ---
@@ -116,7 +116,7 @@ Source of truth: `empusa/workspace.py -> PROFILES`
 
 - Metadata filename: `.empusa-workspace.json`
 - Default workspace root: `/opt/lab/workspaces`
-- Template variables: `{{NAME}}`, `{{PROFILE}}`, `{{DATE}}`
+- Template variables: `{{NAME}}` (auto-set to sanitised workspace name); `{{PROFILE}}`, `{{DATE}}` require explicit `template_vars` from the caller
 
 ---
 

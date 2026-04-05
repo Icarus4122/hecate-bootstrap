@@ -6,7 +6,7 @@ set -euo pipefail
 
 if [[ -z "${1:-}" ]]; then
     echo "Usage: htb.sh <workspace-path>" >&2
-    echo "  e.g. htb.sh /opt/lab/workspaces/boxes/mybox" >&2
+    echo "  e.g. htb.sh /opt/lab/workspaces/mybox" >&2
     exit 1
 fi
 
