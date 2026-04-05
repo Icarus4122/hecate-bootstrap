@@ -29,5 +29,4 @@ _compose() {
         echo "Please install Docker Compose and ensure it's on your PATH." >&2
         return 1
     fi
-    docker compose "${files[@]}" "$@"
 }
