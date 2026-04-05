@@ -4,7 +4,7 @@ All notable changes to Hecate will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.1.0] - 2026-04-05
 
 ### Added
 
@@ -18,9 +18,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
 - Binary sync via GitHub Releases API with `file(1)` validation.
 - GPU and host-network compose overlays.
 - Full documentation suite (`docs/`).
+- Contract-pinning tests: htb profile dirs, ALL_EVENTS validation,
+  make_event round-trips, fallback degradation assertions for launch-lab
+  and create-workspace.
 
 ### Changed
 
 - `labctl` now dispatches `update`, `verify`, and `workspace` subcommands.
 - `launch-lab.sh` delegates workspace creation to Empusa when available.
 - `create-workspace.sh` supports `--profile` flag for Empusa profiles.
+
+### Fixed
+
+- Documentation drift: workspace root, event names, profile list, and
+  tmux profile paths now match Empusa v2.2.1 contract.
