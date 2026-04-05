@@ -17,7 +17,7 @@ echo "╚═══════════════════════�
 # 1. Host packages
 banner "1/8  Host apt packages"
 apt-get update
-grep -Ev '^\s*(#|$)' "$REPO_DIR/host-packages.txt" | \
+grep -Ev '^\s*(#|$)' "$REPO_DIR/manifests/host-packages.txt" | \
     xargs -r apt-get install -y --no-install-recommends
 
 # 2. Docker Engine
