@@ -5,7 +5,6 @@
 services:
   kali-main:
     network_mode: host
-    dns: !reset []
 
   builder:
     network_mode: host

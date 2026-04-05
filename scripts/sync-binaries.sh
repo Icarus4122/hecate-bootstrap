@@ -197,9 +197,8 @@ process_entry() {
                 echo "    ${asset_count} asset(s) in release"
 
                 local -a lines
-                readarray -t lines < <(printf '%s' "$json" | jq - \
-                    '.assets[] | [.name, .browser_download_url, (.size | tostring)] | @tsv')
-
+                a_info="$(printf '%s' "$json" | jq -r --arg pat "$mode" \
+                    '.assets[] | select(.name == $pat) | [.name, .browser_download_url, (.size | tostring)] | @tsv')"
                 for line in "${lines[@]}"; do
                     [[ -z "$line" ]] && continue
                     local a_name a_url a_size

@@ -83,22 +83,18 @@ check_commands() {
 # ═══════════════════════════════════════════════════════════════════
 check_docker() {
     banner "3/9  Docker health"
-
-    # Daemon reachable
     if docker info &>/dev/null; then
-        _pass "Docker daemon reachable"
+        _pass "Docker daemon is reachable"
     else
-        _fail "Docker daemon unreachable (is dockerd running?)"
-        return  # No point checking compose if daemon is down
+        _faile "Docker daemon unreachable (is dockerd running?)"
     fi
 
-    # Compose plugin
-    if docker compose version &>/dev/null; then
-        local cver
-        cver="$(docker compose version --short 2>/dev/null || docker compose version 2>/dev/null | head -1)"
-        _pass "docker compose plugin - ${cver}"
+    if docker compose version >/dev/null 2>&1; then
+        _pass "Docker Compose plugin available"
+    elif docker-compose --version >/dev/null 2>&1; then
+        _warn "docker-compose found but Docker Compose plugin not available"
     else
-        _fail "docker compose plugin not available"
+        _fail "Docker Compose plugin not found (docker compose version failed)"
     fi
 }
 

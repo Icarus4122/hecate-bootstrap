@@ -19,5 +19,15 @@ _compose() {
     if [[ "${LAB_HOSTNET:-0}" == "1" ]]; then
         files+=("-f" "${REPO_DIR}/compose/docker-compose.hostnet.yml")
     fi
+
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "${files[@]}" "$@"
+    elif command -v docker-compose &>/dev/null; then
+        docker-compose "${files[@]}" "$@"
+    else
+        echo "Error: neither 'docker compose' nor 'docker-compose' found." >&2
+        echo "Please install Docker Compose and ensure it's on your PATH." >&2
+        return 1
+    fi
     docker compose "${files[@]}" "$@"
 }
