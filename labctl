@@ -22,37 +22,88 @@ source "${REPO_DIR}/scripts/lib/compose.sh"
 # ── Subcommands ────────────────────────────────────────────────────
 
 cmd_up() {
+    # Pre-flight: catch the two most common first-run failures early.
+    if [[ ! -d "$LAB_ROOT" ]]; then
+        echo "[✗] ${LAB_ROOT} does not exist." >&2
+        echo "    The host has not been provisioned yet." >&2
+        echo "    Run:  sudo labctl bootstrap" >&2
+        return 1
+    fi
+    if [[ ! -f "${REPO_DIR}/.env" ]]; then
+        echo "[✗] .env file not found in ${REPO_DIR}" >&2
+        echo "    Compose needs .env for volume paths and feature flags." >&2
+        echo "    Run:  cp .env.example .env   (then edit as needed)" >&2
+        return 1
+    fi
+
     local profiles=()
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --gpu)      export LAB_GPU=1;      shift ;;
             --hostnet)  export LAB_HOSTNET=1;   shift ;;
             --builder)  profiles+=(--profile build); shift ;;
-            *) echo "[!] Unknown flag: $1" >&2; return 1 ;;
+            *)
+                echo "[!] Unknown flag: $1" >&2
+                echo "    Run 'labctl help up' for valid flags." >&2
+                return 1 ;;
         esac
     done
-    _compose "${profiles[@]}" up -d
-    echo "[✓] Lab is running.  Attach: labctl shell"
+    if ! _compose "${profiles[@]}" up -d; then
+        echo "" >&2
+        echo "[✗] Compose failed to start the lab." >&2
+        echo "    Is Docker running?   systemctl status docker" >&2
+        echo "    Pre-flight check:    labctl verify" >&2
+        return 1
+    fi
+    echo "[✓] Lab is running.  Next: labctl shell"
 }
 
 cmd_down() {
-    _compose down "$@"
+    if ! _compose down "$@"; then
+        echo "[✗] Compose down failed." >&2
+        echo "    Is Docker running?   systemctl status docker" >&2
+        return 1
+    fi
+    echo "[✓] Lab stopped.  Data in ${LAB_ROOT} is intact."
 }
 
 cmd_build() {
     local extra=()
     [[ "${1:-}" == "--no-cache" ]] && extra=(--no-cache)
-    _compose build "${extra[@]}"
+    if ! _compose build "${extra[@]}"; then
+        echo "" >&2
+        echo "[✗] Image build failed." >&2
+        echo "    Check the output above for the failing layer." >&2
+        echo "    Common fixes:" >&2
+        echo "      Network issue?     Retry — apt mirrors can be flaky" >&2
+        echo "      Stale cache?       labctl rebuild   (builds --no-cache)" >&2
+        echo "      Dockerfile error?  Check docker/kali-main/Dockerfile" >&2
+        return 1
+    fi
+    echo "[✓] Images built.  Next: labctl up"
 }
 
 cmd_rebuild() {
     _compose build --no-cache
-    echo "[✓] Rebuilt.  Run: labctl up"
+    echo "[✓] Rebuilt.  Next: labctl up"
 }
 
 cmd_shell() {
     local target="${1:-kali-main}"
-    _compose exec "$target" /bin/bash
+    if ! _compose exec "$target" /bin/bash 2>/dev/null; then
+        echo "" >&2
+        echo "[✗] Cannot open shell in '${target}'." >&2
+        # Distinguish between "not running" and "doesn't exist".
+        if _compose ps --status running 2>/dev/null | grep -q "$target"; then
+            echo "    Container exists but exec failed.  Check:" >&2
+            echo "      labctl logs ${target}" >&2
+        else
+            echo "    Container is not running." >&2
+            echo "    Start the lab first:  labctl up" >&2
+            echo "    Or launch a session:  labctl launch default" >&2
+        fi
+        return 1
+    fi
 }
 
 cmd_logs() {
@@ -94,32 +145,128 @@ cmd_workspace() {
 }
 
 cmd_status() {
-    echo "═══ Lab Status ═══"
-    echo ""
-    printf "Containers:\n"
-    _compose ps 2>/dev/null || echo "  (not running)"
-    echo ""
-    printf "VPN (tun0):\n"
-    if ip addr show tun0 &>/dev/null; then
-        ip -4 addr show tun0 | awk '/inet/{print "  " $2}'
-    else
-        echo "  not connected"
+    # ── Collect state (fast, all read-only) ────────────────────────
+    local kali_state="stopped" builder_state="stopped" kali_up=false
+
+    # Container states via compose ps (handles both plugin and standalone).
+    local ps_out
+    if ps_out="$(_compose ps --format '{{.Name}} {{.State}}' 2>/dev/null)"; then
+        while read -r cname cstate; do
+            case "$cname" in
+                lab-kali|*kali-main*) kali_state="$cstate"; [[ "$cstate" == "running" ]] && kali_up=true ;;
+                lab-builder|*builder*) builder_state="$cstate" ;;
+            esac
+        done <<< "$ps_out"
     fi
-    echo ""
-    printf "GPU:\n"
+
+    # Network mode.
+    local net_mode="bridge"
+    [[ "${LAB_HOSTNET:-0}" == "1" ]] && net_mode="host"
+
+    # GPU.
+    local gpu_mode="off"
+    [[ "${LAB_GPU:-0}" == "1" ]] && gpu_mode="on"
+    local gpu_hw=""
     if command -v nvidia-smi &>/dev/null; then
-        nvidia-smi --query-gpu=name,driver_version,memory.total \
-            --format=csv,noheader 2>/dev/null | sed 's/^/  /'
+        gpu_hw="$(nvidia-smi --query-gpu=name --format=csv,noheader 2>/dev/null | head -1)" || true
+    fi
+
+    # VPN.
+    local vpn="disconnected"
+    local vpn_ip=""
+    if ip addr show tun0 &>/dev/null 2>&1; then
+        vpn="connected"
+        vpn_ip="$(ip -4 addr show tun0 2>/dev/null | awk '/inet/{print $2; exit}')"
+    fi
+
+    # Lab root.
+    local lab_provisioned=false disk_usage="" ws_count=0 bin_count=0
+    if [[ -d "$LAB_ROOT" ]]; then
+        lab_provisioned=true
+        disk_usage="$(du -sh "$LAB_ROOT" 2>/dev/null | awk '{print $1}')"
+        ws_count="$(find "$LAB_ROOT/workspaces" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+        bin_count="$(find "$LAB_ROOT/tools/binaries" -type f 2>/dev/null | wc -l)"
+    fi
+
+    # Active tmux sessions inside the container.
+    local tmux_sessions=""
+    if $kali_up; then
+        tmux_sessions="$(_compose exec -T kali-main tmux list-sessions -F '#{session_name}' 2>/dev/null | paste -sd ', ')" || true
+    fi
+
+    # ── Render ─────────────────────────────────────────────────────
+    echo ""
+    echo "── labctl status ──────────────────────────────────────────"
+    echo ""
+
+    # Lab state — headline.
+    if $kali_up; then
+        echo "  Lab          [✓] running"
     else
-        echo "  nvidia-smi not found"
+        echo "  Lab          [✗] stopped"
+    fi
+
+    # Containers.
+    local _kali_tok="✗" _builder_tok="✗"
+    [[ "$kali_state" == "running" ]] && _kali_tok="✓"
+    [[ "$builder_state" == "running" ]] && _builder_tok="✓"
+
+    printf "  kali-main    [%s] %s\n" "$_kali_tok" "$kali_state"
+    if [[ "$builder_state" != "stopped" ]] || \
+       _compose ps --format '{{.Name}}' 2>/dev/null | grep -q builder; then
+        printf "  builder      [%s] %s\n" "$_builder_tok" "$builder_state"
+    fi
+
+    echo ""
+
+    # Network / overlays.
+    printf "  Network      %s" "$net_mode"
+    [[ "$net_mode" == "host" ]] && printf "  (VPN/tun0 accessible inside container)"
+    echo ""
+
+    # GPU.
+    printf "  GPU          %s" "$gpu_mode"
+    if [[ "$gpu_mode" == "on" && -n "$gpu_hw" ]]; then
+        printf "  (%s)" "$gpu_hw"
+    elif [[ "$gpu_mode" == "off" && -n "$gpu_hw" ]]; then
+        printf "  (available — start with: labctl up --gpu)"
     fi
     echo ""
-    printf "Lab root: %s\n" "$LAB_ROOT"
-    if [[ -d "$LAB_ROOT" ]]; then
-        du -sh "$LAB_ROOT" 2>/dev/null | awk '{print "  Disk: " $1}'
-        echo "  Workspaces: $(find "$LAB_ROOT/workspaces" -mindepth 1 -maxdepth 1 -type d 2>/dev/null | wc -l)"
+
+    # VPN.
+    printf "  VPN          %s" "$vpn"
+    [[ -n "$vpn_ip" ]] && printf "  %s" "$vpn_ip"
+    echo ""
+
+    echo ""
+
+    # /opt/lab.
+    if $lab_provisioned; then
+        printf "  Lab root     %s  (%s)\n" "$LAB_ROOT" "${disk_usage:-?}"
+        printf "  Workspaces   %d\n" "$ws_count"
+        if [[ "$bin_count" -gt 0 ]]; then
+            printf "  Binaries     %d files synced\n" "$bin_count"
+        else
+            printf "  Binaries     none  (run: labctl sync)\n"
+        fi
     else
-        echo "  (not provisioned - run: sudo labctl bootstrap)"
+        printf "  Lab root     %s  [not provisioned]\n" "$LAB_ROOT"
+        printf "               Run: sudo labctl bootstrap\n"
+    fi
+
+    # tmux sessions.
+    if [[ -n "$tmux_sessions" ]]; then
+        echo ""
+        printf "  tmux         %s\n" "$tmux_sessions"
+    fi
+
+    echo ""
+
+    # Quick actions.
+    if ! $kali_up; then
+        echo "  Start:  labctl up          Build:  labctl build"
+        echo "  Guide:  labctl guide       Verify: labctl verify"
+        echo ""
     fi
 }
 
@@ -152,45 +299,490 @@ cmd_clean() {
     fi
 }
 
+cmd_guide() {
+    bash "$REPO_DIR/scripts/guide.sh" "$@"
+}
+
+cmd_version() {
+    local sha="unknown" branch="unknown" date="unknown"
+    if [[ -d "${REPO_DIR}/.git" ]]; then
+        sha="$(git -C "$REPO_DIR" rev-parse --short HEAD 2>/dev/null || echo "unknown")"
+        branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")"
+        date="$(git -C "$REPO_DIR" log -1 --format=%cd --date=short 2>/dev/null || echo "unknown")"
+    fi
+    echo "labctl (hecate-bootstrap)  ${branch}@${sha}  ${date}"
+}
+
+# ── Help system ────────────────────────────────────────────────────
+
 cmd_help() {
+    local topic="${1:-}"
+
+    # Dispatch to per-command help if a topic was given.
+    if [[ -n "$topic" ]]; then
+        local fn="cmd_help_${topic}"
+        if declare -f "$fn" &>/dev/null; then
+            "$fn"
+            return
+        fi
+        echo "[!] No help entry for '${topic}'." >&2
+        echo "    Run 'labctl help' for all commands." >&2
+        return 1
+    fi
+
     cat <<'HELP'
-labctl - Offensive-security lab control
+labctl — Control surface for the Hecate offensive-security lab.
 
-LIFECYCLE
-  up [--gpu] [--hostnet] [--builder]   Start containers
-  down                                 Stop containers
-  build [--no-cache]                   Build images
-  rebuild                              Build images (no cache)
-  clean                                Remove containers / volumes / prune
+  Manages a Dockerized operator workstation built on Kali Rolling.
+  Containers run your tools; persistent data lives on the host at
+  /opt/lab and survives rebuilds.  labctl is the single entry point
+  for setup, daily operation, and maintenance.
 
-INTERACTION
-  shell [container]                    Exec into container (default: kali-main)
-  logs  [container]                    Follow logs
+GETTING STARTED (first-time setup)
+  New here?  Run 'labctl guide' for a step-by-step interactive walkthrough.
 
-TOOLING
-  sync [-n NAME] [--dry-run]           Sync pinned binaries from manifests/binaries.tsv
-  tmux  <profile>                      Launch a tmux session profile (inside container)
+  Or follow these commands manually, in order, on a fresh Ubuntu 24.04 host:
 
-WORKFLOW
-  launch <profile> [target]            Workspace + compose up + kali-main tmux session
-                                       Profiles: default, htb, build, research
-                                       Uses Empusa for workspace init when available
-  workspace <name> [--profile P]       Create workspace via Empusa (htb|build|research|internal)
-                                       Falls back to minimal scaffold without Empusa
+    sudo labctl bootstrap       1. Install dependencies, create /opt/lab, seed config
+    labctl verify               2. Confirm the host is ready (safe, read-only)
+    labctl build                3. Build the kali-main container image
+    labctl up                   4. Start the lab
+    labctl launch default       5. Enter kali-main with a tmux operator session
 
-OPS
-  status                               Lab health, VPN, GPU, disk
-  verify                               Pre-flight host checks (read-only)
-  update [flags]                       Safe platform update (--pull --empusa --binaries
-                                         --no-build --no-restart --builder --gpu
-                                         --hostnet --force)
-  bootstrap                            One-time host provisioning (sudo)
-  help                                 This message
+  After step 1, log out and back in so the docker group takes effect.
+
+DAILY WORKFLOW
+  labctl up                     Start the lab (if not already running)
+  labctl launch <profile>       Start containers + enter kali-main via tmux
+  labctl shell                  Quick bash shell inside kali-main
+  labctl status                 Check what is running, VPN, GPU, disk
+  labctl down                   Stop the lab when done
+
+  Launch profiles — each sets up a tmux layout suited to the task:
+    default                     General-purpose session (main + ops windows)
+    htb <target>                HTB engagement — creates a workspace for <target>
+    build [name]                Compilation — starts the builder sidecar container
+    research [topic]            Research / learning session
+
+  Run 'labctl help launch' for detail.
+
+COMMANDS
+  Lifecycle        What it does
+  ─────────────    ──────────────────────────────────────────────────
+  up               Start containers         [--gpu] [--hostnet] [--builder]
+  down             Stop and remove containers
+  build            Build container images    [--no-cache]
+  rebuild          Build from scratch (no Docker cache)
+  clean            Remove containers, volumes, and prune images
+
+  Interaction
+  ─────────────    ──────────────────────────────────────────────────
+  shell            Bash into a container     [container]  (default: kali-main)
+  logs             Follow container logs     [container]  (default: all)
+
+  Tooling
+  ─────────────    ──────────────────────────────────────────────────
+  sync             Download pinned binaries  [-n NAME] [--dry-run]
+  tmux             Launch a tmux profile inside the container
+
+  Workflow
+  ─────────────    ──────────────────────────────────────────────────
+  launch           Full launch — workspace + containers + tmux session
+  workspace        Create an engagement workspace      [--profile P]
+
+  Operations
+  ─────────────    ──────────────────────────────────────────────────
+  guide            Interactive setup walkthrough   [--explain]
+  status           Lab health — containers, VPN, GPU, disk
+  verify           Pre-flight host checks (read-only, always safe)
+  update           Platform update           [--pull] [--empusa] [--binaries] …
+  bootstrap        One-time host provisioning (requires sudo)
+  version          Print labctl version info
+  help [command]   This message, or help for a specific command
+
+EXAMPLES
+  First-time setup (run once, then log out and back in after step 1):
+    sudo labctl bootstrap             Provision host, create /opt/lab, seed config
+    labctl build                      Build the kali-main container image
+    labctl up                         Start the lab
+    labctl launch default             Enter kali-main with a tmux session
+
+  HTB engagement against "resolute":
+    labctl launch htb resolute        Create workspace + tmux session htb-resolute
+
+  Research a vulnerability:
+    labctl launch research cve-2024-1234
+                                      Workspace + tmux session research-cve-2024-1234
+
+  Build a custom tool with the builder sidecar:
+    labctl launch build internal-webapp
+                                      Workspace + builder container + tmux
+
+  Enter a running lab:
+    labctl shell                      Quick bash shell in kali-main
+    labctl shell builder              Shell into the builder sidecar
+
+  GPU passthrough + host-network VPN access:
+    labctl up --gpu --hostnet         Both overlays in one command
+
+  Sync binaries and update the platform:
+    labctl sync --dry-run             Preview binary downloads
+    labctl update --pull --empusa     Pull repo + update Empusa engine
+
+  Create a workspace without launching:
+    labctl workspace resolute --profile htb
+
+TROUBLESHOOTING
+  labctl verify                      Run first — catches most setup issues
+  labctl status                      Is the lab actually running?
+  labctl logs kali-main              Check container logs for errors
+  labctl build --no-cache            Force a clean image rebuild
+  labctl clean                       Nuclear option — wipe containers + volumes
+
+  More detail: docs/troubleshooting.md
 
 ENVIRONMENT
-  LAB_ROOT       /opt/lab              Persistent data root
-  LAB_GPU=1                            Stack GPU compose overlay
-  LAB_HOSTNET=1                        Stack host-network compose overlay
+  LAB_ROOT       /opt/lab             Persistent data root (tools, workspaces, etc.)
+  LAB_GPU=1                           Enable NVIDIA GPU passthrough (hashcat, etc.)
+  LAB_HOSTNET=1                       Use host networking (direct VPN/tun0 access)
+
+  Run 'labctl help up' or 'labctl help launch' for flag details.
+HELP
+}
+
+# ── Per-command help ───────────────────────────────────────────────
+
+cmd_help_up() {
+    cat <<'HELP'
+labctl up [--gpu] [--hostnet] [--builder]
+
+  Start the lab containers in the background.
+
+  --gpu        Enable NVIDIA GPU passthrough.  Requires nvidia-container-toolkit
+               on the host.  Used for hashcat, GPU-accelerated tasks.
+  --hostnet    Use host networking instead of Docker bridge.  Gives containers
+               direct access to host interfaces including tun0 (VPN).
+  --builder    Also start the builder sidecar — a headless Ubuntu container
+               for cross-compilation.  Shares /opt/lab/tools with kali-main.
+
+  Flags can be combined:  labctl up --gpu --hostnet --builder
+
+  After 'up', enter the lab with:
+    labctl shell          Quick bash shell
+    labctl launch default Full tmux session
+
+  Examples:
+    labctl up                           Start kali-main in bridge mode
+    labctl up --gpu                     Enable GPU passthrough for hashcat
+    labctl up --hostnet                 Host networking — direct tun0/VPN access
+    labctl up --gpu --hostnet --builder All overlays + builder sidecar
+HELP
+}
+
+cmd_help_down() {
+    cat <<'HELP'
+labctl down
+
+  Stop and remove lab containers.  Data in /opt/lab is not affected.
+  Equivalent to: docker compose down
+
+  Examples:
+    labctl down                         Stop kali-main (and builder if running)
+HELP
+}
+
+cmd_help_build() {
+    cat <<'HELP'
+labctl build [--no-cache]
+
+  Build the kali-main (and builder) container images from the Dockerfiles
+  in docker/.
+
+  --no-cache    Ignore Docker layer cache — rebuild every layer from scratch.
+                Use when a base image update or apt-package change is not
+                being picked up.
+
+  Shortcut:  labctl rebuild   (always uses --no-cache)
+
+  After building:  labctl up
+
+  Examples:
+    labctl build                        Build all images (uses Docker cache)
+    labctl build --no-cache             Full rebuild from scratch
+    labctl rebuild                      Alias for build --no-cache
+HELP
+}
+
+cmd_help_launch() {
+    cat <<'HELP'
+labctl launch <profile> [target]
+
+  The full-stack launch command.  In one step it:
+    1. Creates a workspace directory (if the profile takes a target/topic)
+    2. Starts the compose stack (labctl up)
+    3. Enters the kali-main container with a tmux session
+
+  What is a workspace?
+    A directory under /opt/lab/workspaces/<name> that holds your notes,
+    scans, loot, and logs for one engagement or project.  Everything in
+    it persists on the host and survives container rebuilds.
+
+  What is tmux?
+    A terminal multiplexer — think of it as tabs + split panes inside
+    the container.  Each profile creates a pre-configured layout.
+    Detach any time with Ctrl-b d.  Reattach by running the same
+    launch command again.
+
+  Profiles:
+    default              General-purpose session.  No workspace created.
+                         tmux session: lab        windows: main, ops
+
+    htb <target>         Offensive engagement against <target>.
+                         Creates /opt/lab/workspaces/<target>.
+                         tmux session: htb-<target>  windows: main, ops
+                         Both windows start in the workspace directory.
+
+    build [name]         Compilation / tooling.  Starts the builder sidecar
+                         (headless Ubuntu) alongside kali-main for cross-
+                         compilation.  Optional workspace.
+                         tmux session: build[-<name>]  windows: build, tools
+
+    research [topic]     Research / study session.  Optional workspace.
+                         tmux session: research[-<topic>]  windows: research, notes
+
+  Re-entry:
+    Running the same launch command again reattaches to the existing tmux
+    session.  The workspace is not modified.  No session naming collisions —
+    each target/topic gets its own tmux session.
+
+  Examples:
+    labctl launch default               General-purpose session, no workspace
+    labctl launch htb resolute          HTB engagement for "resolute"
+    labctl launch build internal-webapp Build workspace + builder sidecar
+    labctl launch research cve-2024-1234
+                                        Research session for a CVE
+
+  When Empusa is installed, workspaces get full profile-specific layouts
+  and template seeding.  Without Empusa, a minimal directory scaffold
+  (notes/, scans/, loot/, logs/) is created instead.
+HELP
+}
+
+cmd_help_workspace() {
+    cat <<'HELP'
+labctl workspace <name> [--profile <profile>]
+
+  Create an engagement workspace directory under /opt/lab/workspaces/.
+
+  Profiles: htb (default), build, research, internal
+
+  With Empusa installed, the workspace receives profile-specific
+  subdirectories, seeded templates, metadata, and lifecycle events.
+  Without Empusa, a minimal scaffold is created: notes/, scans/,
+  loot/, logs/.
+
+  Running without a name lists existing workspaces.
+
+  Examples:
+    labctl workspace                    List existing workspaces
+    labctl workspace resolute           Create workspace (default htb profile)
+    labctl workspace internal-webapp --profile build
+                                        Create a build-profiled workspace
+HELP
+}
+
+cmd_help_sync() {
+    cat <<'HELP'
+labctl sync [-n NAME] [--dry-run]
+
+  Download pinned external binaries listed in manifests/binaries.tsv
+  into /opt/lab/tools/binaries/.
+
+  -n, --name NAME    Download only the named entry (e.g. chisel)
+  --dry-run          Preview what would be downloaded, without writing files
+
+  The manifest uses the GitHub Releases API.  Set GITHUB_TOKEN for
+  higher rate limits (60 → 5,000 requests/hour).
+
+  Examples:
+    labctl sync                         Download everything in the manifest
+    labctl sync --name chisel           Download only chisel
+    labctl sync --dry-run               Preview
+HELP
+}
+
+cmd_help_tmux() {
+    cat <<'HELP'
+labctl tmux <profile>
+
+  Launch a tmux session profile inside the container.
+
+  Available profiles:
+    default     2 windows: main, ops          (working dir: /opt/lab)
+    htb         2 windows: main, ops          (requires workspace path arg)
+    build       2 windows: build, tools       (working dir: /opt/lab/tools)
+    research    2 windows: research, notes    (working dir: workspace or /opt/lab)
+
+  Run 'labctl tmux' without arguments to list available profiles.
+
+  Note: 'labctl launch' calls the matching tmux profile automatically.
+  Use 'labctl tmux' directly only when you want to start a tmux session
+  inside an already-running container without the full launch flow.
+
+  Examples:
+    labctl tmux                         List available profiles
+    labctl tmux default                 Start the default 2-window layout
+    labctl tmux htb                     Start the htb layout (needs workspace)
+HELP
+}
+
+cmd_help_status() {
+    cat <<'HELP'
+labctl status
+
+  Compact operational dashboard.  Shows at a glance:
+    - Lab state (running / stopped)
+    - Container status (kali-main, builder sidecar if present)
+    - Network mode (bridge or host) and GPU overlay
+    - VPN connection (tun0 interface and IP)
+    - /opt/lab disk usage, workspace count, synced binaries
+    - Active tmux sessions inside the container
+
+  No flags.  Read-only — this command never changes anything.
+
+  When the lab is stopped, quick-start actions are printed at the
+  bottom so you don't have to remember the next command.
+
+  Example:
+    labctl status                       Display the lab dashboard
+HELP
+}
+
+cmd_help_verify() {
+    cat <<'HELP'
+labctl verify
+
+  Run pre-flight checks on the host.  Validates:
+    - Ubuntu version                    - Required host commands
+    - Docker daemon + Compose plugin    - /opt/lab directory tree
+    - Repository files                  - Empusa installation
+    - Binary sync state                 - GPU runtime (if LAB_GPU=1)
+
+  Read-only — this never modifies the system.  Safe to run at any time.
+  Returns exit code 1 if any critical check fails.
+
+  Run this after bootstrap, before first launch, and when diagnosing
+  any issue.  It catches most problems before they surface as cryptic
+  Docker errors.
+
+  Example:
+    labctl verify                   Standard checks
+    LAB_GPU=1 labctl verify         Also verify GPU passthrough
+HELP
+}
+
+cmd_help_update() {
+    cat <<'HELP'
+labctl update [flags]
+
+  Safely update the lab platform.  Runs host verification first, then
+  optionally pulls the repo, updates Empusa, syncs binaries, rebuilds
+  images, and restarts containers.  /opt/lab is never modified.
+
+  On build failure, running containers are left intact — you can keep
+  working while you diagnose.
+
+  Flags:
+    --pull        git pull the hecate-bootstrap repo
+    --empusa      Update the Empusa workspace engine
+    --binaries    Re-sync external binaries from manifests/binaries.tsv
+    --no-build    Skip the image rebuild step
+    --no-restart  Skip the compose restart after building
+    --builder     Include the builder sidecar in the restart
+    --gpu         Pass LAB_GPU=1 to compose operations
+    --hostnet     Pass LAB_HOSTNET=1 to compose operations
+    --force       Skip confirmation prompts
+
+  Common patterns:
+    labctl update --pull --empusa --binaries   Full update
+    labctl update --pull --force               Pull + rebuild, no prompts
+    labctl update --no-build --empusa          Update Empusa only
+HELP
+}
+
+cmd_help_bootstrap() {
+    cat <<'HELP'
+labctl bootstrap
+
+  One-time host provisioning.  Must be run as root (sudo labctl bootstrap).
+
+  Performs 8 steps:
+    1. Install host apt packages from manifests/apt-host.txt
+    2. Install Docker Engine + Compose plugin
+    3. Add current user to the docker group
+    4. Install NVIDIA Container Toolkit (if GPU detected)
+    5. Create /opt/lab directory tree
+    6. Seed .env from .env.example
+    7. Install Empusa workspace engine
+    8. Symlink labctl to /usr/local/bin/
+
+  After bootstrap, log out and back in for the docker group to take
+  effect, then:
+    labctl verify
+    labctl build
+    labctl up
+HELP
+}
+
+cmd_help_clean() {
+    cat <<'HELP'
+labctl clean
+
+  Interactive cleanup.  Removes containers and volumes managed by this
+  project, then prunes dangling Docker images.
+
+  /opt/lab is NEVER touched.  Your workspaces, tools, and data are safe.
+
+  You will be prompted before anything is deleted.
+
+  Examples:
+    labctl clean                        Interactive cleanup (asks before deleting)
+    labctl clean && labctl rebuild      Full reset — clean slate + fresh images
+HELP
+}
+
+cmd_help_version() {
+    cat <<'HELP'
+labctl version
+
+  Print the current labctl version: git branch, short commit SHA, and
+  commit date.  Useful for bug reports and verifying which checkout is
+  deployed.
+HELP
+}
+
+cmd_help_guide() {
+    cat <<'HELP'
+labctl guide [--explain]
+
+  Interactive setup walkthrough for first-time operators.
+
+  Walks through 7 steps — verify, bootstrap, docker group, sync,
+  build, up, and entering the lab — one at a time.  Each step is
+  explained before anything runs.  Nothing is executed without
+  your confirmation.
+
+  --explain    Read-only reference mode.  Prints every step's
+               explanation without prompts or execution.  Useful
+               for reading ahead or sharing the setup guide.
+
+  The guide detects what is already done (e.g. Docker installed,
+  images built, containers running) and notes it at each step,
+  so re-running after a partial setup picks up where you left off.
+
+  Examples:
+    labctl guide              Walk through setup interactively
+    labctl guide --explain    Print the full guide as a reference
 HELP
 }
 
@@ -199,13 +791,15 @@ main() {
     local cmd="${1:-help}"
     shift || true
     case "$cmd" in
-        up|down|build|rebuild|shell|logs|sync|tmux|launch|workspace|status|verify|update|bootstrap|clean|help)
+        up|down|build|rebuild|shell|logs|sync|tmux|launch|workspace|status|verify|update|bootstrap|clean|help|version|guide)
             "cmd_$cmd" "$@" ;;
         -h|--help)
-            cmd_help ;;
+            cmd_help "$@" ;;
+        -v|--version)
+            cmd_version ;;
         *)
             echo "[!] Unknown command: $cmd" >&2
-            cmd_help
+            echo "    Run 'labctl help' for available commands." >&2
             return 1 ;;
     esac
 }

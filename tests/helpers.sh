@@ -126,6 +126,33 @@ assert_exit_code() {
     fi
 }
 
+# Assert that output contains ALL listed substrings (space-safe: one per arg).
+assert_contains_all() {
+    local haystack="$1"; shift
+    local label="${1:-assert_contains_all}"; shift
+    local missing=()
+    for needle in "$@"; do
+        [[ "$haystack" == *"$needle"* ]] || missing+=("$needle")
+    done
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        _record_pass "$label"
+    else
+        _record_fail "$label" "missing: ${missing[*]}" "all present"
+    fi
+}
+
+# Assert that a multi-line string contains a line matching a regex.
+assert_line_match() {
+    local text="$1" pattern="$2" label="${3:-assert_line_match}"
+    while IFS= read -r line; do
+        if [[ "$line" =~ $pattern ]]; then
+            _record_pass "$label"
+            return
+        fi
+    done <<< "$text"
+    _record_fail "$label" "(no line matches /${pattern}/)" "at least one match"
+}
+
 # ── Summary ────────────────────────────────────────────────────────
 end_tests() {
     echo ""

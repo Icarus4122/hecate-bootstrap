@@ -42,7 +42,7 @@ mkdir -p "$REPO_DIR"
 OUT="$SANDBOX/out.txt"
 
 # Reset counters between tests
-_reset() { PASS=0; WARN=0; FAIL=0; }
+_reset() { PASS=0; WARN=0; FAIL=0; FAIL_LOG=(); WARN_LOG=(); }
 
 # ═══════════════════════════════════════════════════════════════════
 #  Output helpers: _pass / _warn / _fail
@@ -51,17 +51,17 @@ _reset() { PASS=0; WARN=0; FAIL=0; }
 _reset
 _pass "something works" > "$OUT" 2>&1
 assert_eq "1" "$PASS" "_pass increments PASS counter"
-assert_contains "$(cat "$OUT")" "[PASS]" "_pass prints [PASS] tag"
+assert_contains "$(cat "$OUT")" "[✓]" "_pass prints [✓] tag"
 
 _reset
 _warn "something suspicious" > "$OUT" 2>&1
 assert_eq "1" "$WARN" "_warn increments WARN counter"
-assert_contains "$(cat "$OUT")" "[WARN]" "_warn prints [WARN] tag"
+assert_contains "$(cat "$OUT")" "[!]" "_warn prints [!] tag"
 
 _reset
 _fail "something boke" > "$OUT" 2>&1
 assert_eq "1" "$FAIL" "_fail increments FAIL counter"
-assert_contains "$(cat "$OUT")" "[FAIL]" "_fail prints [FAIL] tag"
+assert_contains "$(cat "$OUT")" "[✗]" "_fail prints [✗] tag"
 
 # ═══════════════════════════════════════════════════════════════════
 #  check_lab_layout - directory tree verification
@@ -141,22 +141,23 @@ assert_contains "$(cat "$OUT")" "empusa installed" "empusa: output says installe
 #  print_summary - output and exit-code logic
 # ═══════════════════════════════════════════════════════════════════
 
-# Summary with failues
-FAIL=3; PASS=5; WARN=1
+# Summary with failures
+FAIL=3; PASS=5; WARN=1; FAIL_LOG=("item A" "item B" "item C")
 print_summary > "$OUT" 2>&1
-assert_contains "$(cat "$OUT")" "PASS: 5" "summary: shows PASS count"
-assert_contains "$(cat "$OUT")" "FAIL: 3" "summary: shows FAIL count"
-assert_contains "$(cat "$OUT")" "WARN: 1" "summary: shows WARN count"
-assert_contains "$(cat "$OUT")" "NOT ready" "summary: failues -> NOT ready"
+assert_contains "$(cat "$OUT")" "5 passed" "summary: shows pass count"
+assert_contains "$(cat "$OUT")" "3 failed" "summary: shows fail count"
+assert_contains "$(cat "$OUT")" "1 warnings" "summary: shows warn count"
+assert_contains "$(cat "$OUT")" "NOT ready" "summary: failures -> NOT ready"
+assert_contains "$(cat "$OUT")" "Failed checks" "summary: reprints failed items header"
 
 # Summary with only warnings
-FAIL=0; PASS=5; WARN=2
+FAIL=0; PASS=5; WARN=2; FAIL_LOG=()
 print_summary > "$OUT" 2>&1
-assert_contains "$(cat "$OUT")" "usable but has warnings" "summary: wans-only text"
+assert_contains "$(cat "$OUT")" "usable but has warnings" "summary: warns-only text"
 
-# Summary all clea
-FAIL=0; PASS=5; WARN=0
+# Summary all clear
+FAIL=0; PASS=5; WARN=0; FAIL_LOG=()
 print_summary > "$OUT" 2>&1
-assert_contains "$(cat "$OUT")" "ready" "summary: all-clea text"
+assert_contains "$(cat "$OUT")" "Host is ready" "summary: all-clear text"
 
 end_tests

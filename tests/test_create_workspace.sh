@@ -41,7 +41,7 @@ assert_dir_exists "$LAB_ROOT/workspaces/testbox/notes" "fallback: notes/ created
 assert_dir_exists "$LAB_ROOT/workspaces/testbox/scans" "fallback: scans/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/testbox/loot" "fallback: loot/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/testbox/logs" "fallback: logs/ created"
-assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
+assert_contains "$(cat "$OUT")" "Empusa not found" "fallback: output mentions Empusa not found"
 
 # ── Fallback degradation: must NOT have profile-specific dirs ──────
 for missing_dir in web creds exploits screenshots reports; do

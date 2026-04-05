@@ -32,27 +32,48 @@ environment, not a network of targets.
 
 ## Table of Contents
 
-- [Architecture](#architecture)
-- [Host Requirements](#host-requirements)
-- [Repository Structure](#repository-structure)
-- [Persistent Data Model](#persistent-data-model)
-- [Bootstrap Sequence](#bootstrap-sequence)
-- [Image Build](#image-build)
-- [Launch Workflow](#launch-workflow)
-- [tmux](#tmux)
-- [Binary Sync](#binary-sync)
-- [Empusa](#empusa)
-- [GPU Overlay](#gpu-overlay)
-- [Host-Network Overlay](#host-network-overlay)
-- [labctl Reference](#labctl-reference)
-- [Environment Variables](#environment-variables)
-- [Host Verification](#host-verification)
-- [Platform Update](#platform-update)
-- [Adding Tools](#adding-tools)
-- [Tests](#tests)
-- [Troubleshooting](#troubleshooting)
-- [What Is Excluded from Git](#what-is-excluded-from-git)
-- [License](#license)
+- [Hecate](#hecate)
+  - [Quick Links](#quick-links)
+  - [Table of Contents](#table-of-contents)
+  - [Architecture](#architecture)
+  - [Host Requirements](#host-requirements)
+  - [Repository Structure](#repository-structure)
+  - [Persistent Data Model](#persistent-data-model)
+  - [Bootstrap Sequence](#bootstrap-sequence)
+  - [Image Build](#image-build)
+  - [Launch Workflow](#launch-workflow)
+    - [default](#default)
+    - [htb](#htb)
+    - [build](#build)
+    - [research](#research)
+  - [tmux](#tmux)
+  - [Binary Sync](#binary-sync)
+  - [Empusa](#empusa)
+  - [GPU Overlay](#gpu-overlay)
+  - [Host-Network Overlay](#host-network-overlay)
+  - [Workflow Examples](#workflow-examples)
+    - [First-Time Setup](#first-time-setup)
+    - [HTB / Offensive Engagement](#htb--offensive-engagement)
+    - [Research Session](#research-session)
+    - [Build / Cross-Compilation](#build--cross-compilation)
+    - [GPU + Host-Network VPN](#gpu--host-network-vpn)
+    - [Troubleshooting](#troubleshooting)
+  - [labctl Reference](#labctl-reference)
+    - [Lifecycle](#lifecycle)
+    - [Interaction](#interaction)
+    - [Tooling](#tooling)
+    - [Workflow](#workflow)
+    - [Ops](#ops)
+  - [Environment Variables](#environment-variables)
+  - [Host Verification](#host-verification)
+  - [Platform Update](#platform-update)
+  - [Adding Tools](#adding-tools)
+  - [Tests](#tests)
+    - [What is tested](#what-is-tested)
+    - [What requires manual verification](#what-requires-manual-verification)
+  - [Troubleshooting](#troubleshooting-1)
+  - [What Is Excluded from Git](#what-is-excluded-from-git)
+  - [License](#license)
 
 ---
 
@@ -242,7 +263,7 @@ Session name is `htb-resolute` so multiple targets can run concurrently.
 ### build
 
 ```bash
-labctl launch build my-implant    # with project workspace
+labctl launch build internal-webapp    # with project workspace
 labctl launch build               # defaults to /opt/lab/tools
 ```
 
@@ -368,6 +389,61 @@ stack, including `tun0` - useful when the VPN is running on the host and you nee
 direct access from inside the container without NAT.
 
 VPN always runs on the host, never inside containers.
+
+---
+
+## Workflow Examples
+
+Copy-pasteable commands for the most common operator workflows.  Each example
+uses realistic names — substitute your own target, project, or topic.
+
+### First-Time Setup
+
+```bash
+sudo labctl bootstrap                   # provision host (once)
+# log out and back in for docker group
+labctl sync                             # download pinned binaries
+labctl build                            # build the kali-main image
+labctl up                               # start the lab
+labctl launch default                   # enter kali-main via tmux
+```
+
+### HTB / Offensive Engagement
+
+```bash
+labctl launch htb resolute              # workspace + tmux session htb-resolute
+labctl launch htb resolute              # re-run to reattach to existing session
+```
+
+### Research Session
+
+```bash
+labctl launch research cve-2024-1234    # workspace + tmux session research-cve-2024-1234
+```
+
+### Build / Cross-Compilation
+
+```bash
+labctl launch build internal-webapp     # workspace + builder sidecar + tmux
+labctl shell builder                    # shell into the builder container
+```
+
+### GPU + Host-Network VPN
+
+```bash
+labctl up --gpu --hostnet               # GPU passthrough + direct tun0 access
+labctl shell                            # enter kali-main
+hashcat -I                              # verify GPU is visible
+```
+
+### Troubleshooting
+
+```bash
+labctl verify                           # pre-flight host checks (always safe)
+labctl status                           # quick dashboard — what is running?
+labctl logs kali-main                   # container logs
+labctl clean && labctl rebuild          # nuclear reset (preserves /opt/lab)
+```
 
 ---
 

@@ -29,10 +29,16 @@ PASS=0
 WARN=0
 FAIL=0
 
+# ── Failure log (reprinted in summary) ─────────────────────────────
+declare -a FAIL_LOG=()
+declare -a WARN_LOG=()
+
 # ── Output helpers ─────────────────────────────────────────────────
-_pass() { ((PASS++)) || true; printf "  [PASS]  %s\n" "$*"; }
-_warn() { ((WARN++)) || true; printf "  [WARN]  %s\n" "$*"; }
-_fail() { ((FAIL++)) || true; printf "  [FAIL]  %s\n" "$*"; }
+_pass() { ((PASS++)) || true; printf "  [✓]  %s\n" "$*"; }
+_warn() { ((WARN++)) || true; printf "  [!]  %s\n" "$*"; WARN_LOG+=("$*"); }
+_fail() { ((FAIL++)) || true; printf "  [✗]  %s\n" "$*"; FAIL_LOG+=("$*"); }
+_fix()  { printf "       Fix: %s\n" "$*"; }
+_note() { printf "       %s\n" "$*"; }
 banner() { echo ""; echo "── $1 ──"; }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -48,6 +54,8 @@ check_os() {
             _pass "Ubuntu 24.04 LTS (${desc})"
         else
             _warn "Expected Ubuntu 24.04 LTS - found: ${desc}"
+            _note "Hecate is tested on Ubuntu 24.04.  Other distros may work"
+            _note "but are not officially supported."
         fi
     else
         _warn "/etc/os-release not found - cannot determine host OS"
@@ -74,6 +82,7 @@ check_commands() {
             _pass "${cmd} - ${ver}"
         else
             _fail "${cmd} not found"
+            _fix "sudo apt install ${cmd}"
         fi
     done
 }
@@ -86,15 +95,21 @@ check_docker() {
     if docker info &>/dev/null; then
         _pass "Docker daemon is reachable"
     else
-        _faile "Docker daemon unreachable (is dockerd running?)"
+        _fail "Docker daemon unreachable"
+        _note "Docker may not be running, or the current user is not in the docker group."
+        _fix "sudo systemctl start docker"
+        _fix "sudo usermod -aG docker \$USER && newgrp docker"
     fi
 
     if docker compose version >/dev/null 2>&1; then
         _pass "Docker Compose plugin available"
     elif docker-compose --version >/dev/null 2>&1; then
-        _warn "docker-compose found but Docker Compose plugin not available"
+        _warn "Legacy docker-compose found, but Docker Compose plugin is not available"
+        _note "labctl works with both, but the Compose plugin is recommended."
+        _fix "sudo apt install docker-compose-plugin"
     else
-        _fail "Docker Compose plugin not found (docker compose version failed)"
+        _fail "Docker Compose not found (neither plugin nor standalone)"
+        _fix "sudo apt install docker-compose-plugin"
     fi
 }
 
@@ -105,7 +120,9 @@ check_lab_layout() {
     banner "4/9  ${LAB_ROOT} directory tree"
 
     if [[ ! -d "$LAB_ROOT" ]]; then
-        _fail "${LAB_ROOT} does not exist (run: sudo labctl bootstrap)"
+        _fail "${LAB_ROOT} does not exist"
+        _note "The lab host has not been provisioned yet."
+        _fix "sudo labctl bootstrap"
         return
     fi
     _pass "${LAB_ROOT} exists"
@@ -128,6 +145,11 @@ check_lab_layout() {
             _fail "${LAB_ROOT}/${d} missing"
         fi
     done
+
+    # If any dirs were missing, print one remediation line.
+    if [[ "$FAIL" -gt 0 ]]; then
+        _fix "sudo labctl bootstrap   (re-creates the full directory tree)"
+    fi
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -161,6 +183,7 @@ check_repo_files() {
         _pass "tmux profiles - ${profiles_found} found"
     else
         _warn "No tmux profiles found under tmux/profiles/"
+        _note "labctl launch will not be able to set up tmux sessions."
     fi
 }
 
@@ -168,7 +191,7 @@ check_repo_files() {
 #  6. Empusa installation
 # ═══════════════════════════════════════════════════════════════════
 check_empusa() {
-    banner "6/9  Empusa"
+    banner "6/9  Empusa (workspace engine)"
     local empusa_bin="${LAB_ROOT}/tools/venvs/empusa/bin/empusa"
 
     if [[ -x "$empusa_bin" ]]; then
@@ -176,7 +199,10 @@ check_empusa() {
         ver="$("$empusa_bin" --version 2>/dev/null || echo "version unknown")"
         _pass "empusa installed - ${ver}"
     else
-        _warn "empusa not found at ${empusa_bin} (labctl workspace will use shell fallback)"
+        _warn "empusa not found at ${empusa_bin}"
+        _note "Without Empusa, labctl workspace creates a minimal directory"
+        _note "scaffold instead of full profiled workspaces."
+        _fix "bash scripts/install-empusa.sh install"
     fi
 }
 
@@ -184,13 +210,14 @@ check_empusa() {
 #  7. Binary sync destination
 # ═══════════════════════════════════════════════════════════════════
 check_binaries() {
-    banner "7/9  Binary sync destination"
+    banner "7/9  Synced binaries"
     local bin_dir="${LAB_ROOT}/tools/binaries"
 
     if [[ -d "$bin_dir" ]]; then
         _pass "${bin_dir} exists"
     else
         _fail "${bin_dir} missing"
+        _fix "sudo labctl bootstrap   (creates the directory tree)"
         return
     fi
 
@@ -200,7 +227,8 @@ check_binaries() {
         count="$(find "${bin_dir}/chisel" -type f 2>/dev/null | wc -l)"
         _pass "chisel assets present (${count} files)"
     else
-        _warn "No chisel assets found - run: labctl sync"
+        _warn "No chisel assets found — binaries have not been synced yet"
+        _fix "labctl sync"
     fi
 }
 
@@ -208,13 +236,17 @@ check_binaries() {
 #  8. GPU (optional)
 # ═══════════════════════════════════════════════════════════════════
 check_gpu() {
-    banner "8/9  GPU"
+    banner "8/9  GPU (optional)"
 
     if ! command -v nvidia-smi &>/dev/null; then
         if [[ "${LAB_GPU:-0}" == "1" ]]; then
             _fail "LAB_GPU=1 but nvidia-smi not found"
+            _note "GPU passthrough was requested but the NVIDIA driver is missing."
+            _fix "Install the NVIDIA driver, then: bash scripts/setup-nvidia.sh"
         else
-            _warn "nvidia-smi not found - GPU passthrough unavailable"
+            _warn "nvidia-smi not found — GPU passthrough unavailable"
+            _note "Not needed unless you plan to use hashcat or GPU workloads."
+            _note "To enable later: install the NVIDIA driver, then: bash scripts/setup-nvidia.sh"
         fi
         return
     fi
@@ -236,30 +268,73 @@ check_gpu() {
         local ctk_ver
         ctk_ver="$(nvidia-ctk --version 2>/dev/null | head -1 || echo "version unknown")"
         _warn "nvidia-ctk present (${ctk_ver}) but runtime not visible in docker info"
+        _fix "sudo nvidia-ctk runtime configure --runtime=docker && sudo systemctl restart docker"
     else
         if [[ "${LAB_GPU:-0}" == "1" ]]; then
             _fail "LAB_GPU=1 but NVIDIA container toolkit not found"
+            _fix "bash scripts/setup-nvidia.sh"
         else
             _warn "NVIDIA container toolkit not installed"
+            _note "Required only if you want GPU passthrough (labctl up --gpu)."
+            _fix "bash scripts/setup-nvidia.sh"
         fi
     fi
 }
 
 # ═══════════════════════════════════════════════════════════════════
-#  9. Summary
+#  9. .env file
+# ═══════════════════════════════════════════════════════════════════
+check_env_file() {
+    banner "9/9  Configuration"
+
+    if [[ -f "${REPO_DIR}/.env" ]]; then
+        _pass ".env file present"
+    else
+        _warn ".env file not found"
+        _note "labctl uses .env for LAB_ROOT, GPU, and token settings."
+        _fix "cp .env.example .env   (then edit as needed)"
+    fi
+}
+
+# ═══════════════════════════════════════════════════════════════════
+#  Summary
 # ═══════════════════════════════════════════════════════════════════
 print_summary() {
-    banner "Summary"
-    printf "  PASS: %d  |  WARN: %d  |  FAIL: %d\n" "$PASS" "$WARN" "$FAIL"
     echo ""
+    echo "── Summary ──────────────────────────────────────────────────"
+    printf "  ✓ %d passed   ! %d warnings   ✗ %d failed\n" "$PASS" "$WARN" "$FAIL"
 
+    # Reprint failures so the operator doesn't have to scroll
     if [[ "$FAIL" -gt 0 ]]; then
-        echo "  ✗ Host is NOT ready - fix the FAIL items above."
-        echo "    Most can be resolved with:  sudo labctl bootstrap"
+        echo ""
+        echo "  Failed checks:"
+        for msg in "${FAIL_LOG[@]}"; do
+            printf "    ✗ %s\n" "$msg"
+        done
+    fi
+
+    echo ""
+    if [[ "$FAIL" -gt 0 ]]; then
+        echo "  Result: Host is NOT ready — fix the failed items above."
+        echo ""
+        echo "  Next steps:"
+        echo "    Most failures are fixed by running:  sudo labctl bootstrap"
+        echo "    Then re-run:                         labctl verify"
     elif [[ "$WARN" -gt 0 ]]; then
-        echo "  ~ Host is usable but has warnings.  Review items above."
+        echo "  Result: Host is usable but has warnings."
+        echo ""
+        echo "  Next steps:"
+        echo "    Warnings are non-blocking — you can proceed.  Review them"
+        echo "    when convenient.  The lab will work without fixing them."
+        echo "    labctl build              Build container images (if not done)"
+        echo "    labctl up                 Start the lab"
     else
-        echo "  ✓ Host is ready.  Run: labctl up"
+        echo "  Result: Host is ready."
+        echo ""
+        echo "  Next steps:"
+        echo "    labctl build              Build container images (if not done)"
+        echo "    labctl up                 Start the lab"
+        echo "    labctl launch default     Enter kali-main with tmux"
     fi
     echo ""
 }
@@ -268,9 +343,11 @@ print_summary() {
 #  Main
 # ═══════════════════════════════════════════════════════════════════
 main() {
-    echo "╔═══════════════════════════════════════════════════════════╗"
-    echo "║  Hecate · Host verification · $(date +%F)                  ║"
-    echo "╚═══════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    printf "║  Hecate · Host verification · %-31s║\n" "$(date +%F)"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "  This check is read-only — it will not modify your system."
 
     check_os
     check_commands
@@ -280,6 +357,7 @@ main() {
     check_empusa
     check_binaries
     check_gpu
+    check_env_file
     print_summary
 
     if [[ "$FAIL" -gt 0 ]]; then

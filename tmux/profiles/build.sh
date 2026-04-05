@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # tmux/profiles/build.sh - Builder / compilation layout.
-# Usage: build.sh [workspace-path]
+# Args: <session-name> [workspace-path]
 # Windows: build, tools
 set -euo pipefail
 
-WORKSPACE="${1:-/opt/lab/tools}"
-S="build"
+SESSION="${1:-build}"
+WORKSPACE="${2:-/opt/lab/tools}"
 
-tmux has-session -t "$S" 2>/dev/null && { tmux attach -t "$S"; exit 0; }
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux attach -t "$SESSION"
+    exit 0
+fi
 
-tmux new-session -d -s "$S" -n build -c "$WORKSPACE"
-tmux new-window  -t "$S" -n tools -c "$WORKSPACE"
+tmux new-session -d -s "$SESSION" -n build -c "$WORKSPACE"
+tmux new-window  -t "$SESSION" -n tools -c "$WORKSPACE"
 
-tmux select-window -t "$S:build"
-tmux attach -t "$S"
+tmux select-window -t "$SESSION:build"
+tmux attach -t "$SESSION"

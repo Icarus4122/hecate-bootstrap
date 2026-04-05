@@ -62,7 +62,8 @@ for cmd in curl jq file; do
     command -v "$cmd" &>/dev/null || missing+=("$cmd")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "[!] Missing required commands: ${missing[*]}" >&2
+    echo "[✗] Missing required commands: ${missing[*]}" >&2
+    echo "    Install them first:  sudo apt install ${missing[*]}" >&2
     exit 1
 fi
 
@@ -87,13 +88,17 @@ fetch_release() {
     local url="https://api.github.com/repos/${repo}/releases/tags/${tag}"
     local json
     if ! json="$(curl "${gh_curl_opts[@]}" "$url")"; then
-        echo "    ✗ GitHub API request failed: ${url}" >&2
+        echo "    [✗] GitHub API request failed: ${url}" >&2
+        if [[ -z "${GITHUB_TOKEN:-}" ]]; then
+            echo "       Rate-limited?  Set GITHUB_TOKEN for 5 000 req/h (vs 60 anonymous)." >&2
+            echo "       Fix: export GITHUB_TOKEN=ghp_..." >&2
+        fi
         return 1
     fi
 
     if ! printf '%s' "$json" | jq -e '.assets' &>/dev/null; then
-        echo "    ✗ Unexpected API response - no .assets array" >&2
-        echo "      URL: ${url}" >&2
+        echo "    [✗] Unexpected API response — no .assets array" >&2
+        echo "       URL: ${url}" >&2
         return 1
     fi
 
@@ -111,23 +116,23 @@ validate_download() {
 
     # HTML is always rejected - strong indicator of a redirect or error page.
     if [[ "$ftype" == *"HTML document"* ]]; then
-        echo "    ✗ Rejected: HTML document (download likely returned an error page)"
-        echo "      file(1): ${ftype}"
+        echo "    [✗] Rejected: HTML document (download likely returned an error page)"
+        echo "       file(1): ${ftype}"
         return 1
     fi
 
     # XML is always rejected for the same reason.
     if [[ "$ftype" == *"XML document"* ]]; then
-        echo "    ✗ Rejected: XML document"
-        echo "      file(1): ${ftype}"
+        echo "    [✗] Rejected: XML document"
+        echo "       file(1): ${ftype}"
         return 1
     fi
 
     # Text / JSON rejected unless the caller explicitly allows it.
     if [[ "$allow_text" != "true" ]]; then
         if [[ "$ftype" == *"text"* || "$ftype" == *"JSON"* ]]; then
-            echo "    ✗ Rejected: file identified as text, not binary/archive"
-            echo "      file(1): ${ftype}"
+            echo "    [✗] Rejected: file identified as text, not binary/archive"
+            echo "       file(1): ${ftype}"
             return 1
         fi
     fi
@@ -142,8 +147,8 @@ download_one() {
     local tmp="${dest}.tmp.$$"
 
     if ! curl -fsSL -o "$tmp" "$url"; then
-        echo "    ✗ Download failed"
-        echo "      URL: ${url}"
+        echo "    [✗] Download failed"
+        echo "       URL: ${url}"
         rm -f "$tmp"
         return 1
     fi
@@ -161,7 +166,7 @@ download_one() {
 
     local desc
     desc="$(file -b "$dest" | head -c 72)"
-    echo "    ✓ ${desc}"
+    echo "    [✓] ${desc}"
     return 0
 }
 
@@ -194,7 +199,7 @@ process_entry() {
 
                 local asset_count
                 asset_count="$(printf '%s' "$json" | jq '.assets | length')"
-                echo "    ${asset_count} asset(s) in release"
+                echo "    [*] ${asset_count} asset(s) in release"
 
                 local -a lines
                 a_info="$(printf '%s' "$json" | jq -r --arg pat "$mode" \
@@ -237,13 +242,13 @@ process_entry() {
                 mkdir -p "$target_dir"
 
                 local a_info
-                a_info="$(printf '%s' "$json" | jq -r --ag pat "$mode" \
+                a_info="$(printf '%s' "$json" | jq -r --arg pat "$mode" \
                     '.assets[] | select(.name == $pat) | [.name, .browser_download_url, (.size | tostring)] | @tsv')"
 
                 if [[ -z "$a_info" ]]; then
-                    echo "    ✗ Asset not found: ${mode}"
-                    echo "    Available assets:"
-                    printf '%s' "$json" | jq -r '.assets[].name' | sed 's/^/      /'
+                    echo "    [✗] Asset not found: ${mode}"
+                    echo "       Available assets:"
+                    printf '%s' "$json" | jq -r '.assets[].name' | sed 's/^/         /'
                     ERRORS=$((ERRORS + 1))
                     return
                 fi
@@ -289,14 +294,20 @@ process_entry() {
 # ── Main ───────────────────────────────────────────────────────────────────────
 main() {
     if [[ ! -f "$MANIFEST" ]]; then
-        echo "[!] Manifest not found: ${MANIFEST}" >&2
+        echo "[✗] Manifest not found: ${MANIFEST}" >&2
+        echo "    Expected at: manifests/binaries.tsv" >&2
+        echo "    Is this the hecate-bootstrap repo root?" >&2
         exit 1
     fi
 
     $DRY_RUN || mkdir -p "$BIN_DIR"
 
-    echo "[*] Syncing pinned binaries -> ${BIN_DIR}"
-    $DRY_RUN && echo "[*] DRY-RUN - no files will be written"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║  Hecate · Binary sync                                        ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo ""
+    echo "  [*]  Syncing pinned binaries → ${BIN_DIR}"
+    $DRY_RUN && echo "  [*]  DRY-RUN — no files will be written"
     echo ""
 
     local matched=0
@@ -323,20 +334,26 @@ main() {
         exit 1
     fi
 
-    echo "── Summary ──────────────────────────────────────────────"
-    echo "  entries processed : ${matched}"
-    echo "  files downloaded  : ${SYNCED}"
-    echo "  files skipped     : ${SKIPPED}"
-    echo "  errors            : ${ERRORS}"
+    echo ""
+    echo "── Summary ──────────────────────────────────────────────────"
+    echo "  Entries processed : ${matched}"
+    echo "  Files downloaded  : ${SYNCED}"
+    echo "  Files skipped     : ${SKIPPED}"
+    echo "  Errors            : ${ERRORS}"
 
     if [[ "$ERRORS" -gt 0 ]]; then
         echo ""
-        echo "[!] ${ERRORS} error(s) - review output above." >&2
+        echo "  Result: Sync completed with ${ERRORS} error(s) — review output above."
+        echo ""
+        echo "  Next steps:"
+        echo "    labctl sync --name <entry>    Retry a specific entry"
+        echo "    labctl sync --dry-run         Preview what would be fetched"
         exit 1
     fi
 
     echo ""
-    echo "[✓] Sync complete."
+    echo "  Result: Sync complete."
+    echo ""
 }
 
 main "$@"

@@ -62,7 +62,7 @@ assert_dir_exists "$LAB_ROOT/workspaces/target1/notes" "fallback: notes/ created
 assert_dir_exists "$LAB_ROOT/workspaces/target1/scans" "fallback: scans/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/target1/loot" "fallback: loot/ created"
 assert_dir_exists "$LAB_ROOT/workspaces/target1/logs" "fallback: logs/ created"
-assert_contains "$(cat "$OUT")" "fallback" "fallback: output mentions fallback"
+assert_contains "$(cat "$OUT")" "Empusa not found" "fallback: output mentions Empusa not found"
 
 # ── Fallback degradation: must NOT have profile-specific dirs ──────
 # The fallback creates only 4 generic dirs.  Profile-specific dirs
@@ -84,9 +84,9 @@ else
     _record_pass "fallback: no metadata file (correctly degraded)"
 fi
 
-# Case 2: workspace already exists -> skips creation
+# Case 2: workspace already exists -> skips creation silently
 ensure_workspace htb "target1" > "$OUT" 2>&1
-assert_contains "$(cat "$OUT")" "exists" "fallback: existing workspace detected"
+assert_eq "exists" "$WS_STATUS" "fallback: WS_STATUS=exists when workspace present"
 
 # ═══════════════════════════════════════════════════════════════════
 #  launch_htb: requires target argument

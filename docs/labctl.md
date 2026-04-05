@@ -86,3 +86,81 @@ labctl up --gpu --hostnet --builder
 
 All three scripts (`labctl`, `launch-lab.sh`, `update-lab.sh`) source
 the shared helper `scripts/lib/compose.sh` for compose-file stacking.
+
+## Workflow Examples
+
+Copy-pasteable commands for every major workflow.  Substitute your own
+target, project, or topic for the example names.
+
+### First-Time Setup
+
+```bash
+sudo labctl bootstrap                   # provision host, create /opt/lab
+# log out and back in for docker group
+labctl sync                             # download pinned binaries
+labctl build                            # build the kali-main image
+labctl up                               # start the lab
+labctl launch default                   # enter kali-main via tmux
+```
+
+### HTB Engagement
+
+```bash
+labctl launch htb resolute              # create workspace + tmux session htb-resolute
+labctl launch htb resolute              # re-run to reattach to the same session
+```
+
+### Research
+
+```bash
+labctl launch research cve-2024-1234    # workspace + tmux session research-cve-2024-1234
+```
+
+### Build / Cross-Compilation
+
+```bash
+labctl launch build internal-webapp     # workspace + builder sidecar + tmux
+labctl shell builder                    # shell into the headless builder container
+```
+
+### GPU + Host-Network VPN
+
+```bash
+labctl up --gpu --hostnet               # GPU passthrough + direct tun0/VPN access
+labctl shell                            # enter kali-main
+hashcat -I                              # verify GPU inside the container
+```
+
+### Workspace Without Launching
+
+```bash
+labctl workspace resolute               # create htb-profiled workspace only
+labctl workspace internal-webapp --profile build
+```
+
+### Binary Sync
+
+```bash
+labctl sync                             # download everything in manifests/binaries.tsv
+labctl sync --name chisel               # download only chisel
+labctl sync --dry-run                   # preview without writing files
+GITHUB_TOKEN=ghp_xxx labctl sync        # authenticated (5,000 req/hr)
+```
+
+### Platform Update
+
+```bash
+labctl update --pull --empusa --binaries  # full update
+labctl update --pull --force              # pull + rebuild, skip prompts
+labctl update --no-build --empusa         # update Empusa only
+```
+
+### Troubleshooting
+
+```bash
+labctl verify                           # pre-flight host checks (read-only)
+LAB_GPU=1 labctl verify                 # also verify GPU runtime
+labctl status                           # compact dashboard of lab state
+labctl logs kali-main                   # follow container logs
+labctl clean && labctl rebuild          # nuclear reset (preserves /opt/lab)
+```

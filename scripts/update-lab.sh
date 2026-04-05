@@ -96,7 +96,8 @@ parse_flags() {
             --hostnet)    export LAB_HOSTNET=1 ;;
             --force)      OPT_FORCE=1      ;;
             -h|--help)    usage            ;;
-            *)            die "Unknown flag: $1" ;;
+            *)            die "Unknown flag: $1
+  Run 'labctl help update' for valid flags." ;;
         esac
         shift
     done
@@ -272,7 +273,8 @@ step_restart() {
 }
 
 step_summary() {
-    banner "Update summary"
+    echo ""
+    echo "── Summary ──────────────────────────────────────────────────"
     for entry in "${SUMMARY[@]}"; do
         echo "  ${entry}"
     done
@@ -284,9 +286,9 @@ step_summary() {
     done
 
     if [[ "$had_failure" == "1" ]]; then
-        echo "  ~ Update completed with warnings.  Review items above."
+        echo "  Result: Update completed with warnings.  Review items above."
     else
-        echo "  ✓ Update complete."
+        echo "  Result: Update complete."
     fi
     echo ""
     echo "  ${LAB_ROOT} was not modified by this script."
@@ -299,11 +301,23 @@ step_summary() {
 main() {
     parse_flags "$@"
 
-    echo "╔═══════════════════════════════════════════════════════════╗"
-    echo "║  Hecate · Update · $(date +%F)                             ║"
-    echo "╚═══════════════════════════════════════════════════════════╝"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    printf "║  Hecate · Update · %-42s║\n" "$(date +%F)"
+    echo "╚══════════════════════════════════════════════════════════════╝"
 
     step_verify_repo
+
+    # Hint when operator runs bare `labctl update` with no flags.
+    if [[ "$OPT_PULL" == "0" && "$OPT_EMPUSA" == "0" && "$OPT_BINARIES" == "0" ]]; then
+        echo ""
+        echo "[*] No update flags specified — only verify + rebuild will run."
+        echo "    Common patterns:"
+        echo "      labctl update --pull                     Pull repo + rebuild images"
+        echo "      labctl update --pull --empusa --binaries Full update"
+        echo "      labctl update --help                     See all flags"
+        echo ""
+    fi
+
     step_pull
     step_verify_host
     step_empusa

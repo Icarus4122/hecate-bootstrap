@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 # tmux/profiles/research.sh - Research / learning layout.
-# Usage: research.sh [workspace-o-topic-path]
+# Args: <session-name> [workspace-path]
 # Windows: research, notes
 set -euo pipefail
 
-WORKSPACE="${1:-/opt/lab/workspaces/research}"
-S="research"
+SESSION="${1:-research}"
+WORKSPACE="${2:-/opt/lab}"
 
-tmux has-session -t "$S" 2>/dev/null && { tmux attach -t "$S"; exit 0; }
+if tmux has-session -t "$SESSION" 2>/dev/null; then
+    tmux attach -t "$SESSION"
+    exit 0
+fi
 
-tmux new-session -d -s "$S" -n research -c "$WORKSPACE"
-tmux new-window  -t "$S" -n notes    -c "$WORKSPACE"
+tmux new-session -d -s "$SESSION" -n research -c "$WORKSPACE"
+tmux new-window  -t "$SESSION" -n notes    -c "$WORKSPACE"
 
-tmux select-window -t "$S:research"
-tmux attach -t "$S"
+tmux select-window -t "$SESSION:research"
+tmux attach -t "$SESSION"
