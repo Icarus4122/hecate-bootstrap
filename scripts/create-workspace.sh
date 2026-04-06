@@ -13,6 +13,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LAB_ROOT="${LAB_ROOT:-/opt/lab}"
 
+source "${SCRIPT_DIR}/lib/ui.sh"
+
 name="${1:-}"
 profile="${2:-htb}"
 
@@ -31,9 +33,9 @@ shift
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --profile) shift; profile="${1:-htb}"; [[ $# -gt 0 ]] && shift ;;
-        *)         echo "[!] Unknown flag: $1" >&2
-                   echo "    Valid flags: --profile <name>" >&2
-                   echo "    Run 'labctl help workspace' for usage." >&2
+        *)         ui_fail "Unknown flag: $1"
+                   ui_note "Valid flags: --profile <name>" >&2
+                   ui_note "Run 'labctl help workspace' for usage." >&2
                    exit 1 ;;
     esac
 done
@@ -49,7 +51,7 @@ fi
 
 # ── Primary path: delegate to Empusa ──────────────────────────────
 if [[ -n "$EMPUSA" ]]; then
-    echo "[*] Delegating workspace creation to Empusa (${EMPUSA})..."
+    ui_info "Delegating workspace creation to Empusa (${EMPUSA})..."
     exec "$EMPUSA" workspace init \
         --name "$name" \
         --profile "$profile" \
@@ -63,14 +65,14 @@ fi
 # bare workspace directory with no profile-specific subdirectories,
 # no template seeding, and no event emission.  Install Empusa for
 # full workspace support.
-echo "[!] Empusa not found — creating minimal workspace."
+ui_warn "Empusa not found — creating minimal workspace."
 
 ws="$LAB_ROOT/workspaces/$name"
 if [[ -d "$ws" ]]; then
-    echo "[=] Already exists: $ws"
+    ui_info "Already exists: $ws"
     exit 0
 fi
 
 mkdir -p "$ws"/{notes,scans,loot,logs}
-echo "[✓] Created $ws (generic layout — install Empusa for profile '${profile}' support)"
-echo "    Fix: bash scripts/install-empusa.sh install"
+ui_pass "Created $ws (generic layout — install Empusa for profile '${profile}' support)"
+ui_fix "bash scripts/install-empusa.sh install"

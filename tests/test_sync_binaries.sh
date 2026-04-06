@@ -110,7 +110,10 @@ assert_contains "$(cat "$OUT")" "No manifest entry" "args: reports no matching e
 # ═══════════════════════════════════════════════════════════════════
 #  Manifest missing entiely -> error
 #  We copy the script to the sandbox and patch the MANIFEST path.
+#  Also symlink lib/ui.sh so the patched script can source it.
 # ═══════════════════════════════════════════════════════════════════
+mkdir -p "$SANDBOX/lib"
+ln -sf "$_REAL_REPO/scripts/lib/ui.sh" "$SANDBOX/lib/ui.sh"
 sed "s|^MANIFEST=.*|MANIFEST=\"$SANDBOX/nonexistent.tsv\"|" "$SCRIPT" \
     > "$SANDBOX/sync-patched.sh"
 c=0

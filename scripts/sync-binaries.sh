@@ -14,6 +14,7 @@ set -euo pipefail
 # ── Paths ──────────────────────────────────────────────────────────────────────
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
+source "${SCRIPT_DIR}/lib/ui.sh"
 MANIFEST="${REPO_DIR}/manifests/binaries.tsv"
 BIN_DIR="${LAB_ROOT:-/opt/lab}/tools/binaries"
 
@@ -48,11 +49,11 @@ EOF
 while [[ $# -gt 0 ]]; do
     case "$1" in
         -n|--name)
-            [[ -z "${2:-}" ]] && { echo "[!] --name requires an argument" >&2; exit 1; }
+            [[ -z "${2:-}" ]] && { ui_fail "--name requires an argument"; exit 1; }
             FILTER="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
         -h|--help) usage ;;
-        *) echo "[!] Unknown option: $1" >&2; exit 1 ;;
+        *) ui_fail "Unknown option: $1"; exit 1 ;;
     esac
 done
 
@@ -62,8 +63,8 @@ for cmd in curl jq file; do
     command -v "$cmd" &>/dev/null || missing+=("$cmd")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
-    echo "[✗] Missing required commands: ${missing[*]}" >&2
-    echo "    Install them first:  sudo apt install ${missing[*]}" >&2
+    ui_fail "Missing required commands: ${missing[*]}"
+    ui_fix "sudo apt install ${missing[*]}"
     exit 1
 fi
 
@@ -88,7 +89,7 @@ fetch_release() {
     local url="https://api.github.com/repos/${repo}/releases/tags/${tag}"
     local json
     if ! json="$(curl "${gh_curl_opts[@]}" "$url")"; then
-        echo "    [✗] GitHub API request failed: ${url}" >&2
+        echo "    [FAIL] GitHub API request failed: ${url}" >&2
         if [[ -z "${GITHUB_TOKEN:-}" ]]; then
             echo "       Rate-limited?  Set GITHUB_TOKEN for 5 000 req/h (vs 60 anonymous)." >&2
             echo "       Fix: export GITHUB_TOKEN=ghp_..." >&2
@@ -97,7 +98,7 @@ fetch_release() {
     fi
 
     if ! printf '%s' "$json" | jq -e '.assets' &>/dev/null; then
-        echo "    [✗] Unexpected API response — no .assets array" >&2
+        echo "    [FAIL] Unexpected API response — no .assets array" >&2
         echo "       URL: ${url}" >&2
         return 1
     fi
@@ -116,14 +117,14 @@ validate_download() {
 
     # HTML is always rejected - strong indicator of a redirect or error page.
     if [[ "$ftype" == *"HTML document"* ]]; then
-        echo "    [✗] Rejected: HTML document (download likely returned an error page)"
+        echo "    [FAIL] Rejected: HTML document (download likely returned an error page)"
         echo "       file(1): ${ftype}"
         return 1
     fi
 
     # XML is always rejected for the same reason.
     if [[ "$ftype" == *"XML document"* ]]; then
-        echo "    [✗] Rejected: XML document"
+        echo "    [FAIL] Rejected: XML document"
         echo "       file(1): ${ftype}"
         return 1
     fi
@@ -131,7 +132,7 @@ validate_download() {
     # Text / JSON rejected unless the caller explicitly allows it.
     if [[ "$allow_text" != "true" ]]; then
         if [[ "$ftype" == *"text"* || "$ftype" == *"JSON"* ]]; then
-            echo "    [✗] Rejected: file identified as text, not binary/archive"
+            echo "    [FAIL] Rejected: file identified as text, not binary/archive"
             echo "       file(1): ${ftype}"
             return 1
         fi
@@ -147,7 +148,7 @@ download_one() {
     local tmp="${dest}.tmp.$$"
 
     if ! curl -fsSL -o "$tmp" "$url"; then
-        echo "    [✗] Download failed"
+        echo "    [FAIL] Download failed"
         echo "       URL: ${url}"
         rm -f "$tmp"
         return 1
@@ -166,7 +167,7 @@ download_one() {
 
     local desc
     desc="$(file -b "$dest" | head -c 72)"
-    echo "    [✓] ${desc}"
+    echo "    [PASS] ${desc}"
     return 0
 }
 
@@ -185,7 +186,7 @@ process_entry() {
 
     case "$type" in
         github-release)
-            echo "[*] ${name}  (${repo} @ ${tag},  mode=${mode})"
+            ui_info "${name}  (${repo} @ ${tag},  mode=${mode})"
 
             local json
             json="$(fetch_release "$repo" "$tag")" || { ERRORS=$((ERRORS + 1)); return; }
@@ -199,14 +200,14 @@ process_entry() {
 
                 local asset_count
                 asset_count="$(printf '%s' "$json" | jq '.assets | length')"
-                echo "    [*] ${asset_count} asset(s) in release"
+                echo "    [INFO] ${asset_count} asset(s) in release"
 
                 local -a lines
                 mapfile -t lines < <(printf '%s' "$json" | jq -r \
                     '.assets[] | [.name, .browser_download_url, (.size | tostring)] | @tsv')
 
                 if [[ ${#lines[@]} -eq 0 ]]; then
-                    echo "    [✗] Release has no downloadable assets"
+                    echo "    [FAIL] Release has no downloadable assets"
                     ERRORS=$((ERRORS + 1))
                     return
                 fi
@@ -222,15 +223,15 @@ process_entry() {
                         local existing
                         existing="$(file_size "$a_dest")"
                         if [[ "$existing" == "$a_size" ]]; then
-                            echo "    [=] ${a_name}  (${a_size} B)"
+                            echo "    [INFO] ${a_name}  (${a_size} B)  exists"
                             SKIPPED=$((SKIPPED + 1))
                             continue
                         fi
-                        echo "    [~] ${a_name}  size differs - re-downloading"
+                        echo "    [INFO] ${a_name}  size differs - re-downloading"
                         rm -f "$a_dest"
                     fi
 
-                    echo "    [+] ${a_name}  (${a_size} B)"
+                    echo "    [PASS] ${a_name}  (${a_size} B)"
 
                     if $DRY_RUN; then
                         echo "        -> ${a_dest}"
@@ -253,7 +254,7 @@ process_entry() {
                     '.assets[] | select(.name == $pat) | [.name, .browser_download_url, (.size | tostring)] | @tsv')"
 
                 if [[ -z "$a_info" ]]; then
-                    echo "    [✗] Asset not found: ${mode}"
+                    echo "    [FAIL] Asset not found: ${mode}"
                     echo "       Available assets:"
                     printf '%s' "$json" | jq -r '.assets[].name' | sed 's/^/         /'
                     ERRORS=$((ERRORS + 1))
@@ -268,15 +269,15 @@ process_entry() {
                     local existing
                     existing="$(file_size "$a_dest")"
                     if [[ "$existing" == "$a_size" ]]; then
-                        echo "    [=] ${a_name}  (${a_size} B)"
+                        echo "    [INFO] ${a_name}  (${a_size} B)  exists"
                         SKIPPED=$((SKIPPED + 1))
                         return
                     fi
-                    echo "    [~] ${a_name}  size differs - re-downloading"
+                    echo "    [INFO] ${a_name}  size differs - re-downloading"
                     rm -f "$a_dest"
                 fi
 
-                echo "    [+] ${a_name}  (${a_size} B)"
+                echo "    [PASS] ${a_name}  (${a_size} B)"
 
                 if $DRY_RUN; then
                     echo "        -> ${a_dest}"
@@ -292,7 +293,7 @@ process_entry() {
             ;;
 
         *)
-            echo "[!] Unknown source type '${type}' for entry '${name}'" >&2
+            echo "[FAIL] Unknown source type '${type}' for entry '${name}'" >&2
             ERRORS=$((ERRORS + 1))
             ;;
     esac
@@ -301,20 +302,18 @@ process_entry() {
 # ── Main ───────────────────────────────────────────────────────────────────────
 main() {
     if [[ ! -f "$MANIFEST" ]]; then
-        echo "[✗] Manifest not found: ${MANIFEST}" >&2
-        echo "    Expected at: manifests/binaries.tsv" >&2
-        echo "    Is this the hecate-bootstrap repo root?" >&2
+        ui_fail "Manifest not found: ${MANIFEST}"
+        ui_note "Expected at: manifests/binaries.tsv"
+        ui_note "Is this the hecate-bootstrap repo root?"
         exit 1
     fi
 
     $DRY_RUN || mkdir -p "$BIN_DIR"
 
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    echo "║  Hecate · Binary sync                                        ║"
-    echo "╚══════════════════════════════════════════════════════════════╝"
+    ui_banner "Hecate" "Binary sync"
     echo ""
-    echo "  [*]  Syncing pinned binaries → ${BIN_DIR}"
-    $DRY_RUN && echo "  [*]  DRY-RUN — no files will be written"
+    ui_info "Syncing pinned binaries → ${BIN_DIR}"
+    $DRY_RUN && ui_info "DRY-RUN — no files will be written"
     echo ""
 
     local matched=0
@@ -337,24 +336,23 @@ main() {
 
     # ── Summary ────────────────────────────────────────────────────────────────
     if [[ -n "$FILTER" && "$matched" -eq 0 ]]; then
-        echo "[!] No manifest entry named '${FILTER}'" >&2
+        ui_fail "No manifest entry named '${FILTER}'"
         exit 1
     fi
 
-    echo ""
-    echo "── Summary ──────────────────────────────────────────────────"
-    echo "  Entries processed : ${matched}"
-    echo "  Files downloaded  : ${SYNCED}"
-    echo "  Files skipped     : ${SKIPPED}"
-    echo "  Errors            : ${ERRORS}"
+    ui_summary_line
+    ui_kv "Entries" "$matched"
+    ui_kv "Downloaded" "$SYNCED"
+    ui_kv "Skipped" "$SKIPPED"
+    ui_kv "Errors" "$ERRORS"
 
     if [[ "$ERRORS" -gt 0 ]]; then
         echo ""
         echo "  Result: Sync completed with ${ERRORS} error(s) — review output above."
-        echo ""
-        echo "  Next steps:"
-        echo "    labctl sync --name <entry>    Retry a specific entry"
-        echo "    labctl sync --dry-run         Preview what would be fetched"
+
+        ui_next_block \
+            "labctl sync --name <entry>    Retry a specific entry" \
+            "labctl sync --dry-run         Preview what would be fetched"
         exit 1
     fi
 

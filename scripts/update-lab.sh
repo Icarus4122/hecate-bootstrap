@@ -40,14 +40,11 @@ OPT_BUILDER=0
 OPT_FORCE=0
 
 # ── Helpers ────────────────────────────────────────────────────────
-die()  { echo "[!] $*" >&2; exit 1; }
-info() { echo "[*] $*"; }
-ok()   { echo "[✓] $*"; }
-skip() { echo "[=] $*"; }
-banner() { echo ""; echo "── $1 ──"; }
+die()  { ui_fail "$*"; exit 1; }
 
-# ── Compose file stacker ──────────────────────────────────────────
+# ── Compose file stacker / UI primitives ──────────────────────────
 source "${REPO_DIR}/scripts/lib/compose.sh"
+source "${REPO_DIR}/scripts/lib/ui.sh"
 
 # ── Confirmation prompt ────────────────────────────────────────────
 confirm() {
@@ -105,16 +102,16 @@ parse_flags() {
 
 # ── Summary tracking ──────────────────────────────────────────────
 declare -a SUMMARY=()
-_done()    { SUMMARY+=("[✓] $*"); }
-_skipped() { SUMMARY+=("[=] $*"); }
-_failed()  { SUMMARY+=("[!] $*"); }
+_done()    { SUMMARY+=("[PASS] $*"); }
+_skipped() { SUMMARY+=("[INFO] $*"); }
+_failed()  { SUMMARY+=("[WARN] $*"); }
 
 # ═══════════════════════════════════════════════════════════════════
 #  Steps
 # ═══════════════════════════════════════════════════════════════════
 
 step_verify_repo() {
-    banner "Verify repo"
+    ui_section "Verify repo"
     local critical=(
         compose/docker-compose.yml
         docker/kali-main/Dockerfile
@@ -123,13 +120,13 @@ step_verify_repo() {
     for f in "${critical[@]}"; do
         [[ -f "${REPO_DIR}/${f}" ]] || die "Missing critical file: ${f} - is this the hecate-bootstrap repo?"
     done
-    ok "Repo structure intact"
+    ui_pass "Repo structure intact"
 }
 
 step_pull() {
-    banner "Git pull"
+    ui_section "Git pull"
     if [[ "$OPT_PULL" == "0" ]]; then
-        skip "Skipped (use --pull to enable)"
+        ui_info "Skipped (use --pull to enable)"
         _skipped "git pull"
         return
     fi
@@ -140,16 +137,16 @@ step_pull() {
 
     local branch
     branch="$(git -C "$REPO_DIR" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")"
-    info "Pulling ${branch}..."
+    ui_info "Pulling ${branch}..."
 
     if ! confirm "Pull latest changes from origin/${branch}?"; then
-        skip "Pull skipped by operator"
+        ui_info "Pull skipped by operator"
         _skipped "git pull (declined)"
         return
     fi
 
     if git -C "$REPO_DIR" pull --ff-only; then
-        ok "Pulled latest (${branch})"
+        ui_pass "Pulled latest (${branch})"
         _done "git pull (${branch})"
     else
         die "git pull failed - resolve manually before retrying"
@@ -157,19 +154,19 @@ step_pull() {
 }
 
 step_verify_host() {
-    banner "Host verification"
-    info "Running verify-host.sh..."
+    ui_section "Host verification"
+    ui_info "Running verify-host.sh..."
     if bash "$REPO_DIR/scripts/verify-host.sh"; then
-        ok "Host verification passed"
+        ui_pass "Host verification passed"
     else
         die "Host verification failed - fix reported issues before updating"
     fi
 }
 
 step_empusa() {
-    banner "Empusa"
+    ui_section "Empusa"
     if [[ "$OPT_EMPUSA" == "0" ]]; then
-        skip "Skipped (use --empusa to enable)"
+        ui_info "Skipped (use --empusa to enable)"
         _skipped "Empusa update"
         return
     fi
@@ -179,20 +176,20 @@ step_empusa() {
         die "install-empusa.sh not found"
     fi
 
-    info "Updating Empusa..."
+    ui_info "Updating Empusa..."
     if bash "$install_script" update; then
-        ok "Empusa updated"
+        ui_pass "Empusa updated"
         _done "Empusa update"
     else
-        echo "[!] Empusa update failed - continuing (non-fatal)" >&2
+        ui_warn "Empusa update failed - continuing (non-fatal)"
         _failed "Empusa update"
     fi
 }
 
 step_binaries() {
-    banner "Binary sync"
+    ui_section "Binary sync"
     if [[ "$OPT_BINARIES" == "0" ]]; then
-        skip "Skipped (use --binaries to enable)"
+        ui_info "Skipped (use --binaries to enable)"
         _skipped "Binary sync"
         return
     fi
@@ -202,33 +199,33 @@ step_binaries() {
         die "sync-binaries.sh not found"
     fi
 
-    info "Syncing binaries..."
+    ui_info "Syncing binaries..."
     if bash "$sync_script"; then
-        ok "Binaries synced"
+        ui_pass "Binaries synced"
         _done "Binary sync"
     else
-        echo "[!] Binary sync failed - continuing (non-fatal)" >&2
+        ui_warn "Binary sync failed - continuing (non-fatal)"
         _failed "Binary sync"
     fi
 }
 
 step_build() {
-    banner "Image rebuild"
+    ui_section "Image rebuild"
     if [[ "$OPT_BUILD" == "0" ]]; then
-        skip "Skipped (use default or remove --no-build)"
+        ui_info "Skipped (use default or remove --no-build)"
         _skipped "Image rebuild"
         return
     fi
 
-    info "Rebuilding container images..."
+    ui_info "Rebuilding container images..."
     if ! confirm "Rebuild container images?"; then
-        skip "Build skipped by operator"
+        ui_info "Build skipped by operator"
         _skipped "Image rebuild (declined)"
         return
     fi
 
     if _compose build; then
-        ok "Images rebuilt"
+        ui_pass "Images rebuilt"
         _done "Image rebuild"
     else
         _failed "Image rebuild"
@@ -239,9 +236,9 @@ step_build() {
 }
 
 step_restart() {
-    banner "Compose restart"
+    ui_section "Compose restart"
     if [[ "$OPT_RESTART" == "0" ]]; then
-        skip "Skipped (use default or remove --no-restart)"
+        ui_info "Skipped (use default or remove --no-restart)"
         _skipped "Compose restart"
         return
     fi
@@ -249,10 +246,10 @@ step_restart() {
     # Only restart if we actually rebuilt (or if operator wants it)
     local built=0
     for entry in "${SUMMARY[@]}"; do
-        [[ "$entry" == *"Image rebuild" ]] && [[ "$entry" == "[✓]"* ]] && built=1
+        [[ "$entry" == *"Image rebuild" ]] && [[ "$entry" == "[PASS]"* ]] && built=1
     done
     if [[ "$built" == "0" && "$OPT_BUILD" == "1" ]]; then
-        skip "No successful build - skipping restart"
+        ui_info "No successful build - skipping restart"
         _skipped "Compose restart (no build)"
         return
     fi
@@ -262,19 +259,19 @@ step_restart() {
         profiles+=(--profile build)
     fi
 
-    info "Restarting compose stack..."
+    ui_info "Restarting compose stack..."
     if _compose "${profiles[@]}" up -d; then
-        ok "Stack restarted"
+        ui_pass "Stack restarted"
         _done "Compose restart"
     else
         _failed "Compose restart"
-        echo "[!] Compose restart failed - check: docker compose ps" >&2
+        ui_warn "Compose restart failed"
+        ui_fix "docker compose ps"
     fi
 }
 
 step_summary() {
-    echo ""
-    echo "── Summary ──────────────────────────────────────────────────"
+    ui_summary_line
     for entry in "${SUMMARY[@]}"; do
         echo "  ${entry}"
     done
@@ -282,7 +279,7 @@ step_summary() {
 
     local had_failure=0
     for entry in "${SUMMARY[@]}"; do
-        [[ "$entry" == "[!]"* ]] && had_failure=1
+        [[ "$entry" == "[WARN]"* ]] && had_failure=1
     done
 
     if [[ "$had_failure" == "1" ]]; then
@@ -292,7 +289,10 @@ step_summary() {
     fi
     echo ""
     echo "  ${LAB_ROOT} was not modified by this script."
-    echo ""
+
+    ui_next_block \
+        "labctl status                  Check running services" \
+        "labctl shell                   Open a shell in the lab"
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -301,20 +301,18 @@ step_summary() {
 main() {
     parse_flags "$@"
 
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    printf "║  Hecate · Update · %-42s║\n" "$(date +%F)"
-    echo "╚══════════════════════════════════════════════════════════════╝"
+    ui_banner "Hecate" "Update" "$(date +%F)"
 
     step_verify_repo
 
     # Hint when operator runs bare `labctl update` with no flags.
     if [[ "$OPT_PULL" == "0" && "$OPT_EMPUSA" == "0" && "$OPT_BINARIES" == "0" ]]; then
         echo ""
-        echo "[*] No update flags specified — only verify + rebuild will run."
-        echo "    Common patterns:"
-        echo "      labctl update --pull                     Pull repo + rebuild images"
-        echo "      labctl update --pull --empusa --binaries Full update"
-        echo "      labctl update --help                     See all flags"
+        ui_info "No update flags specified — only verify + rebuild will run."
+        ui_note "Common patterns:"
+        ui_note "  labctl update --pull                     Pull repo + rebuild images"
+        ui_note "  labctl update --pull --empusa --binaries Full update"
+        ui_note "  labctl update --help                     See all flags"
         echo ""
     fi
 

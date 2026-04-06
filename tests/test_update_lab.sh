@@ -14,17 +14,19 @@ OUT="$SANDBOX/out.txt"
 _REAL_REPO="$(dirname "$TESTS_DIR")"
 SCRIPT="$_REAL_REPO/scripts/update-lab.sh"
 
-# Build a sourceable version: strip set -euo, main call, and lib source
+# Build a sourceable version: strip set -euo, main call, and lib source lines
 sed -e 's/^set -euo pipefail$//' \
     -e 's/^main "\$@"$//' \
     -e '/^source.*lib\/compose\.sh/d' \
+    -e '/^source.*lib\/ui\.sh/d' \
     "$SCRIPT" > "$SANDBOX/update-funcs.sh"
 
 export LAB_ROOT="$SANDBOX/opt/lab"
 export COMPOSE_PROJECT_NAME="lab"
 mkdir -p "$LAB_ROOT"
 
-# Source shared compose helper from real repo, then the script functions.
+# Source shared helpers from real repo, then the script functions.
+source "$_REAL_REPO/scripts/lib/ui.sh"
 source "$_REAL_REPO/scripts/lib/compose.sh"
 source "$SANDBOX/update-funcs.sh"
 
@@ -95,11 +97,11 @@ _failed "step C"
 
 assert_eq "3" "${#SUMMARY[@]}" "summary tracking: 3 entries"
 assert_contains "${SUMMARY[0]}" "step A" "summary: _done recorded"
-assert_contains "${SUMMARY[0]}" "[✓]" "summary: _done prefix"
+assert_contains "${SUMMARY[0]}" "[PASS]" "summary: _done prefix"
 assert_contains "${SUMMARY[1]}" "step B" "summary: _skipped recorded"
-assert_contains "${SUMMARY[1]}" "[=]" "summary: _skipped prefix"
+assert_contains "${SUMMARY[1]}" "[INFO]" "summary: _skipped prefix"
 assert_contains "${SUMMARY[2]}" "step C" "summary: _failed recorded"
-assert_contains "${SUMMARY[2]}" "[!]" "summary: _failed prefix"
+assert_contains "${SUMMARY[2]}" "[WARN]" "summary: _failed prefix"
 
 # ═══════════════════════════════════════════════════════════════════
 #  step_summary - failure detection
