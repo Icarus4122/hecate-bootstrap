@@ -139,8 +139,15 @@ assert_contains "$out" "labctl help" \
 # ═══════════════════════════════════════════════════════════════════
 #  7. cmd_up: unknown flag -> exit 1 + help pointer
 # ═══════════════════════════════════════════════════════════════════
+# cmd_up checks for .env before parsing flags — use a sandbox REPO_DIR
+# with .env present so we actually reach the flag-validation code path.
+saved_repo="$REPO_DIR"
+REPO_DIR="$SANDBOX/flag-repo"
+mkdir -p "$REPO_DIR"
+touch "$REPO_DIR/.env"
 rc=0
 out="$(cmd_up --bogus 2>&1)" || rc=$?
+REPO_DIR="$saved_repo"
 assert_eq "1" "$rc" "up: unknown flag -> exit 1"
 assert_contains "$out" "Unknown flag" \
     "up: error says 'Unknown flag'"

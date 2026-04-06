@@ -85,10 +85,11 @@ else
     fail "base + gpu + hostnet"
 fi
 
-# Test 5: Services present in base config
+# Test 5: Services present in base config (--profile build activates the
+# profile-gated builder sidecar; docker compose plugin hides it otherwise)
 echo ""
 echo "Service inventory:"
-services="$($COMPOSE_CMD -f "$COMPOSE_DIR/docker-compose.yml" config --services 2>/dev/null)"
+services="$($COMPOSE_CMD -f "$COMPOSE_DIR/docker-compose.yml" --profile build config --services 2>/dev/null)"
 for svc in kali-main builder; do
     if echo "$services" | grep -qx "$svc"; then
         pass "service: $svc"
