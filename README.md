@@ -69,8 +69,9 @@ environment, not a network of targets.
   - [Platform Update](#platform-update)
   - [Adding Tools](#adding-tools)
   - [Tests](#tests)
+    - [CI workflows](#ci-workflows)
     - [What is tested](#what-is-tested)
-    - [What requires manual verification](#what-requires-manual-verification)
+    - [What requires manual or self-hosted verification](#what-requires-manual-or-self-hosted-verification)
   - [Troubleshooting](#troubleshooting-1)
   - [What Is Excluded from Git](#what-is-excluded-from-git)
   - [License](#license)
@@ -560,6 +561,15 @@ The `tests/` directory contains TAP-style shell tests that exercise script logic
 sandboxed temp directories.  No Docker, network access, or real host OS is required.
 CI runs the same suite on every push and PR to `main`.
 
+### CI workflows
+
+| Workflow | Trigger | What it checks |
+| -------- | ------- | -------------- |
+| **CI** (`ci.yml`) | push / PR to `main` | Shell syntax (`bash -n`), ShellCheck lint, TAP shell tests, repo file inventory, compose config validation |
+| **Platform Validation** (`platform-validation.yml`) | `workflow_dispatch` | Full e2e harness (8 stages, 10 scenarios, 941+ checks) — requires self-hosted runner with root + Docker |
+| **Contract Validation** (`contract-validation.yml`) | `workflow_dispatch` + weekly | Cross-repo Hecate ↔ Empusa contract checks (profiles, templates, events, CLI) |
+| **Release Sanity** (`release-sanity.yml`) | `workflow_dispatch` | Version consistency, changelog alignment, lint, tests across both repos |
+
 ### What is tested
 
 | Script | Coverage |
@@ -571,19 +581,33 @@ CI runs the same suite on every push and PR to `main`.
 | `sync-binaries.sh` | `validate_download` (ELF / HTML / XML / text / gzip), argument parsing (gated on `jq` availability) |
 | Empusa resolution | 3-step resolution order (venv -> PATH -> fallback), priority when both exist |
 
-### What requires manual verification
+### What requires manual or self-hosted verification
 
-These areas depend on Docker, network, GPU hardware, or a real Ubuntu host and are
-not exercised in the automated suite:
+These areas depend on Docker, network, GPU hardware, or a real Ubuntu host.
+Use the **Platform Validation** workflow on a self-hosted runner, or run locally:
 
-| Area | Reason |
-| ------ | -------- |
-| `check_docker`, compose up/down/restart | Requires a running Docker daemon |
-| `check_os` (Ubuntu 24.04 detection) | Requires specific host OS |
-| `check_gpu`, NVIDIA runtime checks | Requires physical GPU + driver |
-| `fetch_release`, `download_one`, binary sync | Hits the GitHub API |
-| `step_pull`, `pull_repo`, `ensure_repo` clone | Requires real git remotes |
-| `bootstrap-host.sh` | Modifies the system (apt, usermod, symlinks) |
+```bash
+# Full platform validation (requires root + Docker)
+sudo bash tests/e2e/run-validation.sh
+
+# Stages only (subsystem checks)
+sudo bash tests/e2e/run-validation.sh --stages-only
+
+# Single scenario
+sudo bash tests/e2e/run-validation.sh --scenario fresh-bootstrap
+
+# Dry run (show test plan)
+bash tests/e2e/run-validation.sh --dry-run
+```
+
+| Area | Reason | Covered by |
+| ------ | -------- | ---------- |
+| `check_docker`, compose up/down/restart | Requires a running Docker daemon | E2E stages 2-5 |
+| `check_os` (Ubuntu 24.04 detection) | Requires specific host OS | E2E stage 0 |
+| `check_gpu`, NVIDIA runtime checks | Requires physical GPU + driver | E2E overlay-matrix scenario |
+| `fetch_release`, `download_one`, binary sync | Hits the GitHub API | E2E stage 2 |
+| Full operator journeys | Requires containers, workspaces, tmux | E2E scenarios 1-7 |
+| `bootstrap-host.sh` | Modifies the system (apt, usermod, symlinks) | E2E stage 1 |
 
 Run `labctl verify` on a live host to cover these areas.
 

@@ -1,0 +1,109 @@
+name: Platform Validation
+
+# Full end-to-end validation of the Hecate platform.
+#
+# Runs the complete staged + scenario harness from tests/e2e/.
+# Requires: root privileges, Docker daemon, real host layout.
+#
+# This workflow is designed for self-hosted runners on Ubuntu 24.04
+# with Docker installed and /opt/lab provisioned.  It will NOT work
+# on standard GitHub-hosted ubuntu-latest runners (no root, no
+# persistent /opt/lab, no kali images).
+
+on:
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: "Validation scope"
+        required: true
+        type: choice
+        options:
+          - full
+          - stages-only
+          - scenarios-only
+        default: full
+      single_stage:
+        description: "Single stage number (0-7, blank = all)"
+        required: false
+        type: string
+        default: ""
+      single_scenario:
+        description: "Single scenario name (blank = all)"
+        required: false
+        type: string
+        default: ""
+      stop_on_fail:
+        description: "Stop on first failure"
+        required: false
+        type: boolean
+        default: false
+      skip_bootstrap:
+        description: "Skip bootstrap stage (host already provisioned)"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: E2E Platform Validation
+    # IMPORTANT: Requires a self-hosted runner with:
+    #   - Ubuntu 24.04
+    #   - Root access (runs as root or via sudo)
+    #   - Docker daemon running
+    #   - /opt/lab provisioned (or --skip-bootstrap=false)
+    #   - Kali images built (labctl build)
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Environment summary
+        run: |
+          echo "::group::Environment"
+          echo "Host: $(hostname)"
+          echo "OS:   $(lsb_release -ds 2>/dev/null || cat /etc/os-release | grep PRETTY_NAME | cut -d= -f2)"
+          echo "Kernel: $(uname -r)"
+          echo "User: $(whoami) (uid=$(id -u))"
+          echo "Docker: $(docker --version 2>/dev/null || echo 'not found')"
+          echo "LAB_ROOT: ${LAB_ROOT:-/opt/lab}"
+          echo "Scope: ${{ inputs.scope }}"
+          echo "::endgroup::"
+
+      - name: Build validation flags
+        id: flags
+        run: |
+          FLAGS=""
+          case "${{ inputs.scope }}" in
+            stages-only)    FLAGS="--stages-only" ;;
+            scenarios-only) FLAGS="--scenarios-only" ;;
+          esac
+          if [[ -n "${{ inputs.single_stage }}" ]]; then
+            FLAGS="$FLAGS --stage ${{ inputs.single_stage }}"
+          fi
+          if [[ -n "${{ inputs.single_scenario }}" ]]; then
+            FLAGS="$FLAGS --scenario ${{ inputs.single_scenario }}"
+          fi
+          if [[ "${{ inputs.stop_on_fail }}" == "true" ]]; then
+            FLAGS="$FLAGS --stop-on-fail"
+          fi
+          if [[ "${{ inputs.skip_bootstrap }}" == "true" ]]; then
+            FLAGS="$FLAGS --skip-bootstrap"
+          fi
+          echo "flags=$FLAGS" >> "$GITHUB_OUTPUT"
+
+      - name: Run platform validation
+        run: |
+          sudo bash tests/e2e/run-validation.sh ${{ steps.flags.outputs.flags }}
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-reports-${{ github.run_id }}
+          path: tests/e2e/reports/
+          retention-days: 30
+          if-no-files-found: warn

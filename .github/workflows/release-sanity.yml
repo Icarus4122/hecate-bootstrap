@@ -1,0 +1,57 @@
+name: Release Sanity
+
+# Release-readiness gate for Hecate and Empusa.
+#
+# Validates: version consistency, changelog entries, lint, tests,
+# repo integrity, and cross-repo alignment.
+#
+# Designed as a pre-tag/pre-release check.  Run this before creating
+# a release tag.  The workflow is read-only — it never creates tags,
+# mutates files, or publishes anything.
+
+on:
+  workflow_dispatch:
+    inputs:
+      empusa_ref:
+        description: "Empusa git ref to validate against"
+        required: false
+        type: string
+        default: main
+
+permissions:
+  contents: read
+
+jobs:
+  sanity:
+    name: Release readiness
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Hecate
+        uses: actions/checkout@v4
+        with:
+          path: hecate
+          fetch-depth: 0  # need tags for version checks
+
+      - name: Checkout Empusa
+        uses: actions/checkout@v4
+        with:
+          repository: Icarus4122/empusa
+          ref: ${{ inputs.empusa_ref || 'main' }}
+          path: empusa
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Empusa + dev deps
+        run: pip install -e ./empusa[dev]
+
+      - name: Run release-sanity.sh
+        env:
+          EMPUSA_SRC: ${{ github.workspace }}/empusa
+        run: |
+          cd hecate
+          bash scripts/dev/release-sanity.sh

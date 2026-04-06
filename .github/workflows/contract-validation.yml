@@ -1,0 +1,64 @@
+name: Contract Validation
+
+# Cross-repo Hecate ↔ Empusa contract validation.
+#
+# Detects drift in workspace profiles, CLI expectations, event names,
+# template seeding, and integration assumptions.
+#
+# Runs on: GitHub-hosted runner (no Docker or root required).
+# Triggers: manual dispatch + weekly schedule.
+
+on:
+  workflow_dispatch:
+    inputs:
+      empusa_ref:
+        description: "Empusa git ref to validate against (branch, tag, SHA)"
+        required: false
+        type: string
+        default: main
+  schedule:
+    # Weekly on Monday at 06:00 UTC
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  contract:
+    name: Empusa contract checks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Hecate
+        uses: actions/checkout@v4
+        with:
+          path: hecate
+
+      - name: Checkout Empusa
+        uses: actions/checkout@v4
+        with:
+          repository: Icarus4122/empusa
+          ref: ${{ inputs.empusa_ref || 'main' }}
+          path: empusa
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Empusa
+        run: pip install -e ./empusa
+
+      - name: Run contract tests
+        env:
+          EMPUSA_SRC: ${{ github.workspace }}/empusa
+        run: |
+          cd hecate
+          bash tests/test_empusa_contract.sh
+
+      - name: Run contract validation script
+        env:
+          EMPUSA_SRC: ${{ github.workspace }}/empusa
+        run: |
+          cd hecate
+          bash scripts/dev/ci-contract-check.sh "${{ github.workspace }}/empusa"

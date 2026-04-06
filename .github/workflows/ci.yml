@@ -10,22 +10,62 @@ permissions:
   contents: read
 
 jobs:
+  shellcheck:
+    name: Shell syntax & lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+
+      - name: Syntax check (bash -n)
+        run: bash scripts/dev/ci-syntax-check.sh
+
+      - name: ShellCheck lint
+        run: |
+          shellcheck --severity=error --shell=bash \
+            labctl \
+            scripts/*.sh \
+            scripts/lib/*.sh \
+            tests/helpers.sh \
+            tests/run-all.sh
+
   shell-tests:
     name: Shell tests
     runs-on: ubuntu-latest
-
+    needs: shellcheck
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Ensure dependencies
         run: |
-          # Tests need: bash ≥4, file, jq, curl (all present on ubuntu-latest).
-          # Explicit check so failures are obvious if the runner image changes.
           for cmd in bash file jq curl; do
             command -v "$cmd" >/dev/null || { echo "::error::Missing $cmd"; exit 1; }
           done
-          echo "All dependencies present."
 
       - name: Run test suite
         run: bash tests/run-all.sh
+
+  repo-integrity:
+    name: Repo integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate repo structure
+        run: bash scripts/dev/ci-repo-integrity.sh
+
+  compose-lint:
+    name: Compose config lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install docker-compose
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq docker-compose
+
+      - name: Validate compose files
+        run: bash scripts/dev/ci-compose-lint.sh
