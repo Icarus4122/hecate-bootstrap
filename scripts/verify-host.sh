@@ -24,6 +24,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LAB_ROOT="${LAB_ROOT:-/opt/lab}"
 
+# ── Shared UI primitives ──────────────────────────────────────────
+source "${REPO_DIR}/scripts/lib/ui.sh"
+
 # ── Counters ───────────────────────────────────────────────────────
 PASS=0
 WARN=0
@@ -33,13 +36,13 @@ FAIL=0
 declare -a FAIL_LOG=()
 declare -a WARN_LOG=()
 
-# ── Output helpers ─────────────────────────────────────────────────
-_pass() { ((PASS++)) || true; printf "  [✓]  %s\n" "$*"; }
-_warn() { ((WARN++)) || true; printf "  [!]  %s\n" "$*"; WARN_LOG+=("$*"); }
-_fail() { ((FAIL++)) || true; printf "  [✗]  %s\n" "$*"; FAIL_LOG+=("$*"); }
-_fix()  { printf "       Fix: %s\n" "$*"; }
-_note() { printf "       %s\n" "$*"; }
-banner() { echo ""; echo "── $1 ──"; }
+# ── Output helpers (wrap shared ui.sh + track counters) ─────────────
+_pass() { ((PASS++)) || true; ui_pass "$*"; }
+_warn() { ((WARN++)) || true; ui_warn "$*"; WARN_LOG+=("$*"); }
+_fail() { ((FAIL++)) || true; ui_fail "$*"; FAIL_LOG+=("$*"); }
+_fix()  { ui_fix "$*"; }
+_note() { ui_note "$*"; }
+banner() { ui_section "$1"; }
 
 # ═══════════════════════════════════════════════════════════════════
 #  1. Host OS
@@ -300,54 +303,38 @@ check_env_file() {
 #  Summary
 # ═══════════════════════════════════════════════════════════════════
 print_summary() {
-    echo ""
-    echo "── Summary ──────────────────────────────────────────────────"
-    printf "  ✓ %d passed   ! %d warnings   ✗ %d failed\n" "$PASS" "$WARN" "$FAIL"
+    ui_summary_line
+    printf "  %d passed   %d warnings   %d failed\n" "$PASS" "$WARN" "$FAIL"
 
     # Reprint failures so the operator doesn't have to scroll
     if [[ "$FAIL" -gt 0 ]]; then
         echo ""
         echo "  Failed checks:"
         for msg in "${FAIL_LOG[@]}"; do
-            printf "    ✗ %s\n" "$msg"
+            printf "    [FAIL] %s\n" "$msg"
         done
     fi
 
     echo ""
     if [[ "$FAIL" -gt 0 ]]; then
         echo "  Result: Host is NOT ready — fix the failed items above."
-        echo ""
-        echo "  Next steps:"
-        echo "    Most failures are fixed by running:  sudo labctl bootstrap"
-        echo "    Then re-run:                         labctl verify"
+        ui_next_block "sudo labctl bootstrap" "labctl verify"
     elif [[ "$WARN" -gt 0 ]]; then
         echo "  Result: Host is usable but has warnings."
-        echo ""
-        echo "  Next steps:"
-        echo "    Warnings are non-blocking — you can proceed.  Review them"
-        echo "    when convenient.  The lab will work without fixing them."
-        echo "    labctl build              Build container images (if not done)"
-        echo "    labctl up                 Start the lab"
+        ui_next_block "labctl build" "labctl up"
     else
         echo "  Result: Host is ready."
-        echo ""
-        echo "  Next steps:"
-        echo "    labctl build              Build container images (if not done)"
-        echo "    labctl up                 Start the lab"
-        echo "    labctl launch default     Enter kali-main with tmux"
+        ui_next_block "labctl build" "labctl up" "labctl launch default"
     fi
-    echo ""
 }
 
 # ═══════════════════════════════════════════════════════════════════
 #  Main
 # ═══════════════════════════════════════════════════════════════════
 main() {
-    echo "╔══════════════════════════════════════════════════════════════╗"
-    printf "║  Hecate · Host verification · %-31s║\n" "$(date +%F)"
-    echo "╚══════════════════════════════════════════════════════════════╝"
+    ui_banner "Hecate" "Host verification"
     echo ""
-    echo "  This check is read-only — it will not modify your system."
+    ui_info "This check is read-only — it will not modify your system."
 
     check_os
     check_commands

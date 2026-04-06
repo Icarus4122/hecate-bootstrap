@@ -104,29 +104,29 @@ assert_contains "$ver_out" "labctl" "version: contains 'labctl'"
 # ═══════════════════════════════════════════════════════════════════
 section "Style Guide Compliance"
 
-# labctl: errors use [✗]
-labctl_errors="$(grep -c '\[✗\]' "$REPO_ROOT/labctl" || echo 0)"
+# labctl: errors use ui_fail / ui_error_block (canonical [FAIL])
+labctl_errors="$(grep -cE 'ui_fail|ui_error_block' "$REPO_ROOT/labctl" || echo 0)"
 if [[ "$labctl_errors" -gt 0 ]]; then
-    _record_pass "style: labctl uses [✗] for errors ($labctl_errors)"
+    _record_pass "style: labctl uses ui_fail/ui_error_block ($labctl_errors)"
 else
-    _record_fail "style: labctl uses [✗]" "0" ">0"
+    _record_fail "style: labctl uses ui_fail" "0" ">0"
 fi
 
-# labctl: success uses [✓]
-labctl_success="$(grep -c '\[✓\]' "$REPO_ROOT/labctl" || echo 0)"
+# labctl: success uses ui_pass (canonical [PASS])
+labctl_success="$(grep -c 'ui_pass' "$REPO_ROOT/labctl" || echo 0)"
 if [[ "$labctl_success" -gt 0 ]]; then
-    _record_pass "style: labctl uses [✓] for success ($labctl_success)"
+    _record_pass "style: labctl uses ui_pass ($labctl_success)"
 else
-    _record_fail "style: labctl uses [✓]" "0" ">0"
+    _record_fail "style: labctl uses ui_pass" "0" ">0"
 fi
 
-# Multi-step scripts have banners
+# Multi-step scripts have banners (inline ╔═══╗ OR ui_banner call)
 for script in scripts/bootstrap-host.sh scripts/verify-host.sh \
               scripts/update-lab.sh scripts/sync-binaries.sh; do
-    if grep -qE '╔═+╗' "$REPO_ROOT/$script"; then
+    if grep -qE '╔═+╗|ui_banner' "$REPO_ROOT/$script"; then
         _record_pass "style: $(basename $script) has box banner"
     else
-        _record_fail "style: $(basename $script) box banner" "missing" "╔═══╗"
+        _record_fail "style: $(basename $script) box banner" "missing" "╔═══╗ or ui_banner"
     fi
 done
 
@@ -134,10 +134,10 @@ done
 for script in scripts/bootstrap-host.sh scripts/verify-host.sh \
               scripts/update-lab.sh scripts/sync-binaries.sh; do
     base="$(basename "$script")"
-    if grep -q '── Summary' "$REPO_ROOT/$script"; then
+    if grep -qE '── Summary|ui_summary_line' "$REPO_ROOT/$script"; then
         _record_pass "style: $base has Summary section"
     else
-        _record_fail "style: $base Summary" "missing" "── Summary"
+        _record_fail "style: $base Summary" "missing" "── Summary or ui_summary_line"
     fi
     if grep -q 'Result:' "$REPO_ROOT/$script"; then
         _record_pass "style: $base has Result: label"
@@ -146,22 +146,22 @@ for script in scripts/bootstrap-host.sh scripts/verify-host.sh \
     fi
 done
 
-# No non-standard warning markers
+# No non-standard warning markers (canonical is [WARN] via ui_warn)
 for script in labctl scripts/verify-host.sh scripts/launch-lab.sh; do
-    if grep -qE '\[(warn|WARN|WARNING)\]' "$REPO_ROOT/$script"; then
+    if grep -qE '\[(warn|WARNING)\]' "$REPO_ROOT/$script"; then
         _record_fail "style: $(basename $script) bad warning markers" \
-            "found [warn]/[WARN]" "use [!]"
+            "found [warn]/[WARNING]" "use ui_warn / [WARN]"
     else
-        _record_pass "style: $(basename $script) uses standard [!] warnings"
+        _record_pass "style: $(basename $script) uses standard [WARN] warnings"
     fi
 done
 
-# No old-style success pointers (Run:/Attach: instead of Next:)
-bad_pointers="$(grep -nE 'echo.*\[✓\].*(Run:|Attach:|Start:)' "$REPO_ROOT/labctl" || true)"
+# No old-style success pointers (Run:/Attach: instead of [ACTION] Next)
+bad_pointers="$(grep -nE 'echo.*(Run:|Attach:|Start:)' "$REPO_ROOT/labctl" | grep -vE 'ui_action|\[ACTION\]' || true)"
 if [[ -z "$bad_pointers" ]]; then
-    _record_pass "style: labctl [✓] uses Next: not Run:/Attach:"
+    _record_pass "style: labctl uses [ACTION] not Run:/Attach:"
 else
-    _record_fail "style: labctl [✓] pointers" "$bad_pointers" "Next: only"
+    _record_fail "style: labctl action pointers" "$bad_pointers" "[ACTION] only"
 fi
 
 # ═══════════════════════════════════════════════════════════════════

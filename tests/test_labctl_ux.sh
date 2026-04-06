@@ -25,6 +25,7 @@ LABCTL="$_REAL_REPO/labctl"
 sed -e 's/^set -euo pipefail$//' \
     -e 's/^main "\$@"$//' \
     -e '/^source.*lib\/compose\.sh/d' \
+    -e '/^source.*lib\/ui\.sh/d' \
     "$LABCTL" > "$SANDBOX/labctl-funcs.sh"
 
 export LAB_ROOT="$SANDBOX/opt/lab"
@@ -33,6 +34,7 @@ mkdir -p "$LAB_ROOT"/{workspaces,tools/binaries}
 
 # Source shared compose helper, then labctl functions.
 source "$_REAL_REPO/scripts/lib/compose.sh"
+source "$_REAL_REPO/scripts/lib/ui.sh"
 
 # Override REPO_DIR before sourcing (the script computes it from BASH_SOURCE)
 REPO_DIR="$_REAL_REPO"
@@ -162,8 +164,8 @@ export LAB_ROOT="$SANDBOX/nonexistent"
 rc=0
 out="$(cmd_up 2>&1)" || rc=$?
 assert_eq "1" "$rc" "up: missing LAB_ROOT -> exit 1"
-assert_contains "$out" "[✗]" \
-    "up: missing LAB_ROOT -> [✗] marker"
+assert_contains "$out" "[FAIL]" \
+    "up: missing LAB_ROOT -> [FAIL] marker"
 assert_contains "$out" "bootstrap" \
     "up: missing LAB_ROOT -> mentions bootstrap"
 export LAB_ROOT="$saved_lab"
@@ -194,17 +196,17 @@ mkdir -p "$REPO_DIR"
 touch "$REPO_DIR/.env"
 _compose() { return 0; }
 out="$(cmd_up 2>&1)"
-assert_contains "$out" "[✓]" "up success: has [✓] marker"
-assert_contains "$out" "Next:" "up success: has 'Next:' pointer"
+assert_contains "$out" "[PASS]" "up success: has [PASS] marker"
+assert_contains "$out" "[ACTION]" "up success: has [ACTION] pointer"
 
 # cmd_build success
 out="$(cmd_build 2>&1)"
-assert_contains "$out" "[✓]" "build success: has [✓] marker"
-assert_contains "$out" "Next:" "build success: has 'Next:' pointer"
+assert_contains "$out" "[PASS]" "build success: has [PASS] marker"
+assert_contains "$out" "[ACTION]" "build success: has [ACTION] pointer"
 
 # cmd_down success
 out="$(cmd_down 2>&1)"
-assert_contains "$out" "[✓]" "down success: has [✓] marker"
+assert_contains "$out" "[PASS]" "down success: has [PASS] marker"
 assert_contains "$out" "intact" "down success: mentions data intact"
 REPO_DIR="$saved_repo"
 
@@ -220,7 +222,7 @@ _compose() {
 rc=0
 out="$(cmd_build 2>&1)" || rc=$?
 assert_eq "1" "$rc" "build fail: exit 1"
-assert_contains "$out" "[✗]" "build fail: has [✗] marker"
+assert_contains "$out" "[FAIL]" "build fail: has [FAIL] marker"
 # Must suggest at least one remediation
 assert_match "$out" "labctl|rebuild|Dockerfile" \
     "build fail: suggests remediation"
@@ -230,7 +232,7 @@ _compose() { return 1; }
 rc=0
 out="$(cmd_shell 2>&1)" || rc=$?
 assert_eq "1" "$rc" "shell fail: exit 1"
-assert_contains "$out" "[✗]" "shell fail: has [✗] marker"
+assert_contains "$out" "[FAIL]" "shell fail: has [FAIL] marker"
 assert_contains "$out" "labctl" \
     "shell fail: suggests a labctl command"
 

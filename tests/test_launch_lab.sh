@@ -19,6 +19,7 @@ SCRIPT="$_REAL_REPO/scripts/launch-lab.sh"
 sed -e 's/^set -euo pipefail$//' \
     -e 's/^main "\$@"$//' \
     -e '/^source.*lib\/compose\.sh/d' \
+    -e '/^source.*lib\/ui\.sh/d' \
     "$SCRIPT" > "$SANDBOX/launch-funcs.sh"
 
 # Set up sandbox environment
@@ -26,8 +27,9 @@ export LAB_ROOT="$SANDBOX/opt/lab"
 mkdir -p "$LAB_ROOT"/{workspaces,tools/venvs/empusa/bin}
 export COMPOSE_PROJECT_NAME="lab"
 
-# Source shared compose helper from real repo, then the script functions.
+# Source shared libraries from real repo, then the script functions.
 source "$_REAL_REPO/scripts/lib/compose.sh"
+source "$_REAL_REPO/scripts/lib/ui.sh"
 source "$SANDBOX/launch-funcs.sh"
 
 # Force fallback mode (empusa may be on the host PATH)

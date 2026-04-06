@@ -58,10 +58,10 @@ _check_bare_markers "$REPO/scripts/create-workspace.sh" "style: workspace — no
 # ═══════════════════════════════════════════════════════════════════
 for script in bootstrap-host.sh verify-host.sh update-lab.sh sync-binaries.sh; do
     src="$REPO/scripts/$script"
-    if grep -q '── Summary' "$src"; then
+    if grep -qE '── Summary|ui_summary_line' "$src"; then
         _record_pass "style: ${script} has Summary section"
     else
-        _record_fail "style: ${script} has Summary section" "missing" "── Summary ──"
+        _record_fail "style: ${script} has Summary section" "missing" "── Summary ── or ui_summary_line"
     fi
 done
 
@@ -82,10 +82,10 @@ done
 # ═══════════════════════════════════════════════════════════════════
 for script in bootstrap-host.sh verify-host.sh; do
     src="$REPO/scripts/$script"
-    if grep -q 'Next steps:' "$src"; then
+    if grep -qE 'Next steps:|ui_next_block' "$src"; then
         _record_pass "style: ${script} has Next steps: label"
     else
-        _record_fail "style: ${script} has Next steps: label" "missing" "Next steps:"
+        _record_fail "style: ${script} has Next steps: label" "missing" "Next steps: or ui_next_block"
     fi
 done
 
@@ -94,55 +94,71 @@ done
 # ═══════════════════════════════════════════════════════════════════
 for script in bootstrap-host.sh verify-host.sh update-lab.sh sync-binaries.sh; do
     src="$REPO/scripts/$script"
-    if grep -qE '╔═+╗' "$src"; then
+    if grep -qE '╔═+╗|ui_banner' "$src"; then
         _record_pass "style: ${script} has box banner"
     else
-        _record_fail "style: ${script} has box banner" "missing" "╔═══╗ banner"
+        _record_fail "style: ${script} has box banner" "missing" "╔═══╗ or ui_banner"
     fi
 done
 
-# labctl (dispatcher) should NOT have a box banner (short commands)
-if grep -qE '╔═+╗' "$REPO/labctl"; then
-    _record_fail "style: labctl has no box banner" "found banner" "no banner in dispatcher"
+# labctl uses ui.sh (shared primitives) which should NOT have a standalone box banner.
+# However cmd_status now calls ui_banner, which is correct for major surfaces.
+# The rule is: no INLINE box banner echoed in labctl itself.
+if grep -qE '^echo.*╔═+╗' "$REPO/labctl"; then
+    _record_fail "style: labctl has no inline box banner" "found banner" "use ui_banner from lib/ui.sh"
 else
-    _record_pass "style: labctl has no box banner"
+    _record_pass "style: labctl has no inline box banner"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
-#  6. Error messages use [✗] marker
+#  6. Error messages use [FAIL] marker (via ui_fail from lib/ui.sh)
 # ═══════════════════════════════════════════════════════════════════
 
-# labctl error messages
-labctl_errors="$(grep -c '\[✗\]' "$REPO/labctl" || true)"
+# labctl delegates to ui_fail/ui_error_block
+labctl_errors="$(grep -cE 'ui_fail|ui_error_block' "$REPO/labctl" || true)"
 if [[ "$labctl_errors" -gt 0 ]]; then
-    _record_pass "style: labctl uses [✗] for errors (${labctl_errors} occurrences)"
+    _record_pass "style: labctl uses ui_fail for errors (${labctl_errors} call sites)"
 else
-    _record_fail "style: labctl uses [✗] for errors" "0 occurrences" ">0"
+    _record_fail "style: labctl uses ui_fail for errors" "0 call sites" ">0"
+fi
+
+# Verify ui.sh itself emits [FAIL]
+if grep -q '\[FAIL\]' "$REPO/scripts/lib/ui.sh"; then
+    _record_pass "style: lib/ui.sh defines [FAIL] marker"
+else
+    _record_fail "style: lib/ui.sh defines [FAIL] marker" "missing" "[FAIL]"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
-#  7. Success messages use [✓] marker
+#  7. Success messages use [PASS] marker (via ui_pass from lib/ui.sh)
 # ═══════════════════════════════════════════════════════════════════
-labctl_success="$(grep -c '\[✓\]' "$REPO/labctl" || true)"
+labctl_success="$(grep -c 'ui_pass' "$REPO/labctl" || true)"
 if [[ "$labctl_success" -gt 0 ]]; then
-    _record_pass "style: labctl uses [✓] for success (${labctl_success} occurrences)"
+    _record_pass "style: labctl uses ui_pass for success (${labctl_success} call sites)"
 else
-    _record_fail "style: labctl uses [✓] for success" "0 occurrences" ">0"
+    _record_fail "style: labctl uses ui_pass for success" "0 call sites" ">0"
+fi
+
+if grep -q '\[PASS\]' "$REPO/scripts/lib/ui.sh"; then
+    _record_pass "style: lib/ui.sh defines [PASS] marker"
+else
+    _record_fail "style: lib/ui.sh defines [PASS] marker" "missing" "[PASS]"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
-#  8. Warning messages use [!] marker (not [warn] or WARNING)
+#  8. Warning messages use [WARN] marker (via ui_warn from lib/ui.sh)
+#     Also ensure no non-standard [warn]/[WARNING] patterns
 # ═══════════════════════════════════════════════════════════════════
 for script in labctl scripts/verify-host.sh scripts/launch-lab.sh \
               scripts/create-workspace.sh scripts/sync-binaries.sh; do
     src="$REPO/$script"
     # Check for non-standard warning patterns
-    bad_warn="$(grep -nE '\[(warn|WARN|WARNING)\]' "$src" || true)"
+    bad_warn="$(grep -nE '\[(warn|WARNING)\]' "$src" || true)"
     if [[ -z "$bad_warn" ]]; then
         _record_pass "style: $(basename "$script") — no non-standard warning markers"
     else
         _record_fail "style: $(basename "$script") — no non-standard warning markers" \
-            "$bad_warn" "use [!] not [warn]/[WARNING]"
+            "$bad_warn" "use ui_warn ([WARN]) not [warn]/[WARNING]"
     fi
 done
 
@@ -151,10 +167,10 @@ done
 # ═══════════════════════════════════════════════════════════════════
 for script in scripts/verify-host.sh scripts/create-workspace.sh; do
     src="$REPO/$script"
-    if grep -q 'Fix:' "$src"; then
+    if grep -qE 'Fix:|ui_fix' "$src"; then
         _record_pass "style: $(basename "$script") uses Fix: prefix"
     else
-        _record_fail "style: $(basename "$script") uses Fix: prefix" "missing" "Fix: <command>"
+        _record_fail "style: $(basename "$script") uses Fix: prefix" "missing" "Fix: or ui_fix"
     fi
     # Check no variant spellings
     bad_fix="$(grep -nE '^\s+(fix:|FIX:|To fix:)' "$src" || true)"
@@ -167,17 +183,17 @@ for script in scripts/verify-host.sh scripts/create-workspace.sh; do
 done
 
 # ═══════════════════════════════════════════════════════════════════
-#  10. labctl success messages use "Next:" (not "Run:", "Attach:")
+#  10. labctl success calls use ui_pass/ui_next_block (not "Next:"/"Run:")
 # ═══════════════════════════════════════════════════════════════════
-# Grep the labctl dispatching functions for old-style success pointers
+# Ensure no old-style inline success messages with bare Run:/Attach:
 labctl_src="$(cat "$REPO/labctl")"
 
-bad_pointers="$(echo "$labctl_src" | grep -nE 'echo.*\[✓\].*(Run:|Attach:|Start:)' || true)"
+bad_pointers="$(echo "$labctl_src" | grep -nE 'echo.*\[(PASS|✓)\].*(Run:|Attach:|Start:)' || true)"
 if [[ -z "$bad_pointers" ]]; then
-    _record_pass "style: labctl [✓] lines use 'Next:' not Run:/Attach:"
+    _record_pass "style: labctl success lines use ui_next_block not Run:/Attach:"
 else
-    _record_fail "style: labctl [✓] lines use 'Next:' not Run:/Attach:" \
-        "$bad_pointers" "Next: only"
+    _record_fail "style: labctl success lines use ui_next_block not Run:/Attach:" \
+        "$bad_pointers" "ui_next_block only"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
@@ -199,11 +215,11 @@ done
 for script in scripts/bootstrap-host.sh scripts/verify-host.sh \
               scripts/update-lab.sh scripts/launch-lab.sh; do
     src="$REPO/$script"
-    # Check that banner() or section headers use ── not --
-    if grep -qE 'echo.*"── ' "$src" || grep -qE 'banner\(\).*── ' "$src"; then
+    # Check that banner() or section headers use ── not -- (ui_section/ui_banner is also valid)
+    if grep -qE 'echo.*"── |ui_section|ui_summary_line|ui_banner' "$src"; then
         _record_pass "style: $(basename "$script") uses ── headers"
     else
-        _record_fail "style: $(basename "$script") uses ── headers" "missing" "── headers"
+        _record_fail "style: $(basename "$script") uses ── headers" "missing" "── headers or ui_section"
     fi
 done
 

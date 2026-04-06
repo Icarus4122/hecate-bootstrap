@@ -24,14 +24,16 @@ SCRIPT="$_REAL_REPO/scripts/verify-host.sh"
 _build_sourceable() {
     sed -e 's/^set -euo pipefail$//' \
         -e 's/^main "\$@"$//' \
+        -e '/^source.*lib\/ui\.sh/d' \
         "$SCRIPT" > "$SANDBOX/verify-funcs.sh"
 }
 _build_sourceable
 
-# Set LAB_ROOT BEFORE soucing - the script espects ${LAB_ROOT:-...}
+# Set LAB_ROOT BEFORE sourcing - the script expects ${LAB_ROOT:-...}
 export LAB_ROOT="$SANDBOX/opt/lab"
 
-# Source the functions (defines SCRIPT_DIR, REPO_DIR, counters, helpers)
+# Source ui.sh from the real repo, then the verify functions.
+source "$_REAL_REPO/scripts/lib/ui.sh"
 source "$SANDBOX/verify-funcs.sh"
 
 # Override REPO_DIR to our sandbox mock (the source set it to sandbox paent)
@@ -51,17 +53,17 @@ _reset() { PASS=0; WARN=0; FAIL=0; FAIL_LOG=(); WARN_LOG=(); }
 _reset
 _pass "something works" > "$OUT" 2>&1
 assert_eq "1" "$PASS" "_pass increments PASS counter"
-assert_contains "$(cat "$OUT")" "[✓]" "_pass prints [✓] tag"
+assert_contains "$(cat "$OUT")" "[PASS]" "_pass prints [PASS] tag"
 
 _reset
 _warn "something suspicious" > "$OUT" 2>&1
 assert_eq "1" "$WARN" "_warn increments WARN counter"
-assert_contains "$(cat "$OUT")" "[!]" "_warn prints [!] tag"
+assert_contains "$(cat "$OUT")" "[WARN]" "_warn prints [WARN] tag"
 
 _reset
 _fail "something boke" > "$OUT" 2>&1
 assert_eq "1" "$FAIL" "_fail increments FAIL counter"
-assert_contains "$(cat "$OUT")" "[✗]" "_fail prints [✗] tag"
+assert_contains "$(cat "$OUT")" "[FAIL]" "_fail prints [FAIL] tag"
 
 # ═══════════════════════════════════════════════════════════════════
 #  check_lab_layout - directory tree verification

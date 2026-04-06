@@ -21,6 +21,9 @@ REPO_DIR="$(dirname "$SCRIPT_DIR")"
 export LAB_ROOT="${LAB_ROOT:-/opt/lab}"
 export COMPOSE_PROJECT_NAME="${COMPOSE_PROJECT_NAME:-lab}"
 
+# ── Shared UI primitives ──────────────────────────────────────────
+source "${REPO_DIR}/scripts/lib/ui.sh"
+
 # ── State ──────────────────────────────────────────────────────────────────────
 WORKSPACE_PATH=""
 WS_STATUS="none"  # none | created | exists
@@ -47,8 +50,8 @@ EOF
 }
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
-die()  { echo "[✗] $*" >&2; exit 1; }
-info() { echo "[*] $*"; }
+die()  { ui_fail "$*" >&2; exit 1; }
+info() { ui_info "$*"; }
 
 _should_attach() {
     if [[ "${LAB_LAUNCH_NO_ATTACH:-0}" == "1" ]]; then
@@ -101,11 +104,11 @@ ensure_workspace() {
             --root "$LAB_ROOT/workspaces" \
             --templates-dir "$REPO_DIR/templates" \
             --set-active 2>/dev/null; then
-            echo "[!] Empusa workspace creation failed — falling back to scaffold." >&2
+            ui_warn "Empusa workspace creation failed — falling back to scaffold"
             mkdir -p "$WORKSPACE_PATH"/{notes,scans,loot,logs}
         fi
     else
-        echo "[!] Empusa not found — creating minimal workspace." >&2
+        ui_warn "Empusa not found — creating minimal workspace"
         mkdir -p "$WORKSPACE_PATH"/{notes,scans,loot,logs}
     fi
 }
@@ -116,9 +119,11 @@ source "${REPO_DIR}/scripts/lib/compose.sh"
 ensure_up() {
     if ! _compose "$@" up -d; then
         echo "" >&2
-        echo "[✗] Compose failed to bring up the stack." >&2
-        echo "    Is Docker running?   systemctl status docker" >&2
-        echo "    Pre-flight check:    labctl verify" >&2
+        ui_error_block \
+            "Compose failed to bring up the stack" \
+            "Containers could not be started" \
+            "Docker may not be running" \
+            "systemctl status docker && labctl verify"
         exit 1
     fi
 }
@@ -129,9 +134,11 @@ enter_kali() {
     local profile_script="$1" session="$2"; shift 2
     if ! _compose exec kali-main bash "/etc/tmux.d/profiles/${profile_script}" "$session" "$@"; then
         echo "" >&2
-        echo "[✗] Failed to enter kali-main." >&2
-        echo "    Is the container healthy?   labctl status" >&2
-        echo "    Check container logs:        labctl logs kali-main" >&2
+        ui_error_block \
+            "Failed to enter kali-main" \
+            "The container may be unhealthy or not running" \
+            "Container exec failed" \
+            "labctl status && labctl logs kali-main"
         exit 1
     fi
 }
@@ -168,40 +175,42 @@ _print_summary() {
         build)
             desc="Compilation / tooling session"
             windows="build, tools"
-            extra="  Builder      lab-builder sidecar running alongside (headless Ubuntu)" ;;
+            extra="builder sidecar running alongside (headless Ubuntu)" ;;
         research)
             desc="Research / study session"
             windows="research, notes" ;;
     esac
 
-    echo ""
-    echo "── launch: ${profile}${name:+ / ${name}} ─────────────────────────────────────"
-    echo ""
-    printf "  %-12s %s — %s\n" "Profile" "$profile" "$desc"
+    ui_banner "Hecate" "Launch · ${profile}${name:+ / ${name}}"
 
     # Workspace line.
     if [[ "$WS_STATUS" == "created" ]]; then
-        printf "  %-12s %s  [+created]\n" "Workspace" "$WORKSPACE_PATH"
+        ui_pass "Workspace created"
+        ui_kv "Name" "$name"
+        ui_kv "Path" "$WORKSPACE_PATH"
         local dirs
         dirs="$(_workspace_dirs "$WORKSPACE_PATH")"
-        [[ -n "$dirs" ]] && printf "  %-12s dirs: %s\n" "" "$dirs"
+        [[ -n "$dirs" ]] && ui_kv "Dirs" "$dirs"
     elif [[ "$WS_STATUS" == "exists" ]]; then
-        printf "  %-12s %s  [=exists]\n" "Workspace" "$WORKSPACE_PATH"
+        ui_info "Existing workspace reused"
+        ui_kv "Name" "$name"
+        ui_kv "Path" "$WORKSPACE_PATH"
     fi
 
-    # Container and optional sidecar.
-    printf "  %-12s %s\n" "Container" "kali-main (Kali Rolling)"
-    [[ -n "$extra" ]] && echo "$extra"
+    ui_kv "Profile" "${profile} — ${desc}"
+    ui_kv "Runtime" "kali-main (Kali Rolling)"
+    [[ -n "$extra" ]] && ui_kv "Builder" "$extra"
 
     # tmux.
     if $reattach; then
-        printf "  %-12s %s  (reattaching — session already exists)\n" "tmux" "$session"
+        ui_info "Reattaching to existing tmux session"
+        ui_kv "Session" "$session"
     else
-        printf "  %-12s %s  (windows: %s)\n" "tmux" "$session" "$windows"
+        ui_kv "Session" "${session}  (windows: ${windows})"
     fi
 
     echo ""
-    printf "  Detach: Ctrl-b d     Reattach: labctl launch %s%s\n" "$profile" "${name:+ ${name}}"
+    ui_action "Detach: Ctrl-b d     Reattach: labctl launch ${profile}${name:+ ${name}}"
     echo ""
 }
 
@@ -220,8 +229,8 @@ launch_default() {
         info "Entering kali-main..."
         enter_kali default.sh "$session"
     else
-        echo "[✓] Launch completed (non-interactive mode)."
-        echo "    Reattach later: labctl launch default"
+        ui_pass "Launch completed (non-interactive mode)"
+        ui_next_block "labctl launch default"
     fi
 }
 
@@ -248,8 +257,8 @@ launch_htb() {
         info "Entering kali-main..."
         enter_kali htb.sh "$session" "/opt/lab/workspaces/${target}"
     else
-        echo "[✓] Launch completed (non-interactive mode)."
-        echo "    Reattach later: labctl launch htb ${target}"
+        ui_pass "Launch completed (non-interactive mode)"
+        ui_next_block "labctl launch htb ${target}"
     fi
 }
 
@@ -281,11 +290,11 @@ launch_build() {
             enter_kali build.sh "$session"
         fi
     else
-        echo "[✓] Launch completed (non-interactive mode)."
+        ui_pass "Launch completed (non-interactive mode)"
         if [[ -n "$name" ]]; then
-            echo "    Reattach later: labctl launch build ${name}"
+            ui_next_block "labctl launch build ${name}"
         else
-            echo "    Reattach later: labctl launch build"
+            ui_next_block "labctl launch build"
         fi
     fi
 }
@@ -315,11 +324,11 @@ launch_research() {
             enter_kali research.sh "$session"
         fi
     else
-        echo "[✓] Launch completed (non-interactive mode)."
+        ui_pass "Launch completed (non-interactive mode)"
         if [[ -n "$topic" ]]; then
-            echo "    Reattach later: labctl launch research ${topic}"
+            ui_next_block "labctl launch research ${topic}"
         else
-            echo "    Reattach later: labctl launch research"
+            ui_next_block "labctl launch research"
         fi
     fi
 }
