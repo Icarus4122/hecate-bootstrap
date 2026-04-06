@@ -45,3 +45,6 @@ services:
       - ${LAB_ROOT:-/opt/lab}/data:/opt/lab/data
       - ${LAB_ROOT:-/opt/lab}/tools:/opt/lab/tools
       - ${LAB_ROOT:-/opt/lab}/resources:/opt/lab/resources
+      - ${LAB_ROOT:-/opt/lab}/workspaces:/opt/lab/workspaces
+      - ${LAB_ROOT:-/opt/lab}/knowledge:/opt/lab/knowledge
+      - ${LAB_ROOT:-/opt/lab}/templates:/opt/lab/templates
