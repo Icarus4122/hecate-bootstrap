@@ -79,7 +79,7 @@ unk_out="$(bash "$REPO_ROOT/labctl" nonexistent-cmd 2>&1)"
 unk_rc=$?
 set -e
 assert_eq "1" "$unk_rc" "unknown cmd: exits 1"
-assert_contains "$unk_out" "Unknown command" "unknown cmd: says 'Unknown command'"
+assert_contains "$unk_out" "[FAIL]" "unknown cmd: has [FAIL] marker"
 assert_contains "$unk_out" "labctl help" "unknown cmd: points to help"
 
 # Bad help topic
@@ -88,6 +88,8 @@ bad_help_out="$(bash "$REPO_ROOT/labctl" help nonexistent-topic 2>&1)"
 bad_help_rc=$?
 set -e
 assert_eq "1" "$bad_help_rc" "bad help topic: exits 1"
+assert_contains "$bad_help_out" "[FAIL]" "bad help topic: has [FAIL] marker"
+assert_contains "$bad_help_out" "labctl help" "bad help topic: points to help"
 
 # ═══════════════════════════════════════════════════════════════════
 #  7.5  labctl version

@@ -113,9 +113,9 @@ ui_next_block() {
 ui_error_block() {
     # Usage: ui_error_block "what failed" "why it matters" "likely cause" "fix command"
     local what="${1:-}" why="${2:-}" cause="${3:-}" fix="${4:-}"
-    echo ""
+    echo "" >&2
     ui_fail "$what"
-    [[ -n "$why" ]]   && ui_note "Why: $why"
-    [[ -n "$cause" ]] && ui_note "Cause: $cause"
-    [[ -n "$fix" ]]   && ui_fix "$fix"
+    [[ -n "$why" ]]   && ui_note "Why: $why" >&2
+    [[ -n "$cause" ]] && ui_note "Cause: $cause" >&2
+    [[ -n "$fix" ]]   && ui_fix "$fix" >&2
 }

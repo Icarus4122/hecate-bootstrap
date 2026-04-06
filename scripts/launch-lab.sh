@@ -105,10 +105,13 @@ ensure_workspace() {
             --templates-dir "$REPO_DIR/templates" \
             --set-active 2>/dev/null; then
             ui_warn "Empusa workspace creation failed — falling back to scaffold"
+            ui_note "Install or update Empusa for full workspace features."
             mkdir -p "$WORKSPACE_PATH"/{notes,scans,loot,logs}
         fi
     else
         ui_warn "Empusa not found — creating minimal workspace"
+        ui_note "Install Empusa for profiled workspaces and template seeding:"
+        ui_fix "bash scripts/install-empusa.sh install"
         mkdir -p "$WORKSPACE_PATH"/{notes,scans,loot,logs}
     fi
 }

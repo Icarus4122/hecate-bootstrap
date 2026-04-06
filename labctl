@@ -75,19 +75,18 @@ cmd_down() {
         return 1
     fi
     ui_pass "Lab stopped.  Data in ${LAB_ROOT} is intact."
+    ui_next_block "labctl up" "labctl status"
 }
 
 cmd_build() {
     local extra=()
     [[ "${1:-}" == "--no-cache" ]] && extra=(--no-cache)
     if ! _compose build "${extra[@]}"; then
-        echo "" >&2
-        ui_fail "Image build failed"
-        ui_note "Check the output above for the failing layer."
-        ui_note "Common fixes:"
-        ui_note "  Network issue?     Retry — apt mirrors can be flaky"
-        ui_note "  Stale cache?       labctl rebuild   (builds --no-cache)"
-        ui_note "  Dockerfile error?  Check docker/kali-main/Dockerfile"
+        ui_error_block \
+            "Image build failed" \
+            "Container images must build before the lab can start" \
+            "See the Docker output above for the failing layer" \
+            "labctl rebuild   (clean build, no cache)"
         return 1
     fi
     ui_pass "Images built"
@@ -95,7 +94,14 @@ cmd_build() {
 }
 
 cmd_rebuild() {
-    _compose build --no-cache
+    if ! _compose build --no-cache; then
+        ui_error_block \
+            "Rebuild failed" \
+            "Container images must build before the lab can start" \
+            "See the Docker output above for the failing layer" \
+            "Check docker/kali-main/Dockerfile"
+        return 1
+    fi
     ui_pass "Rebuilt from scratch"
     ui_next_block "labctl up"
 }
@@ -105,14 +111,14 @@ cmd_shell() {
     if ! _compose exec "$target" /bin/bash 2>/dev/null; then
         echo "" >&2
         ui_fail "Cannot open shell in '${target}'"
+        ui_note "Why: the operator shell is the primary way to interact with the lab."
         # Distinguish between "not running" and "doesn't exist".
         if _compose ps --status running 2>/dev/null | grep -q "$target"; then
-            ui_note "Container exists but exec failed."
+            ui_note "Cause: container exists but exec failed."
             ui_fix "labctl logs ${target}"
         else
-            ui_note "Container is not running."
+            ui_note "Cause: container is not running."
             ui_fix "labctl up"
-            ui_fix "labctl launch default"
         fi
         return 1
     fi
@@ -147,6 +153,7 @@ cmd_tmux() {
     local script="$REPO_DIR/tmux/profiles/${profile}.sh"
     if [[ ! -f "$script" ]]; then
         ui_fail "No such profile: $profile"
+        ui_note "Run 'labctl tmux' to list available profiles."
         return 1
     fi
     bash "$script"
@@ -300,6 +307,7 @@ cmd_clean() {
         _compose down -v --remove-orphans
         docker image prune -f
         ui_pass "Cleaned.  Data in ${LAB_ROOT} is intact."
+        ui_next_block "labctl build" "labctl up"
     else
         ui_info "Aborted."
     fi

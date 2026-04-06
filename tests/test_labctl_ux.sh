@@ -208,10 +208,11 @@ assert_contains "$out" "[ACTION]" "build success: has [ACTION] pointer"
 out="$(cmd_down 2>&1)"
 assert_contains "$out" "[PASS]" "down success: has [PASS] marker"
 assert_contains "$out" "intact" "down success: mentions data intact"
+assert_contains "$out" "[ACTION]" "down success: has [ACTION] pointer"
 REPO_DIR="$saved_repo"
 
 # ═══════════════════════════════════════════════════════════════════
-#  11. Failure messages: consistent [✗] + remediation
+#  11. Failure messages: consistent [FAIL] + remediation
 # ═══════════════════════════════════════════════════════════════════
 
 # cmd_build failure
@@ -253,8 +254,8 @@ fi
 rc=0
 out="$(cmd_help "nonexistent" 2>&1)" || rc=$?
 assert_eq "1" "$rc" "help: bad topic -> exit 1"
-assert_contains "$out" "No help entry" \
-    "help: bad topic -> says 'No help entry'"
+assert_contains "$out" "[FAIL]" \
+    "help: bad topic -> has [FAIL] marker"
 assert_contains "$out" "labctl help" \
     "help: bad topic -> points to 'labctl help'"
 

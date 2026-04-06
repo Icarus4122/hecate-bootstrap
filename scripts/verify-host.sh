@@ -161,6 +161,7 @@ check_lab_layout() {
 check_repo_files() {
     banner "5/9  Repository files"
 
+    local _pre_fail_count=$FAIL
     local files=(
         compose/docker-compose.yml
         compose/docker-compose.gpu.yml
@@ -176,6 +177,13 @@ check_repo_files() {
             _fail "${f} missing from repo"
         fi
     done
+
+    # Collective remediation if any repo files are missing.
+    local repo_fails=$((FAIL - _pre_fail_count))
+    if [[ "$repo_fails" -gt 0 ]]; then
+        _note "Missing repo files break compose, build, or sync operations."
+        _fix "git -C ${REPO_DIR} checkout -- <file>   or re-clone the repo"
+    fi
 
     # tmux profiles
     local profiles_found=0
