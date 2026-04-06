@@ -98,7 +98,8 @@ for tmpl in $EXPECTED_TEMPLATES; do
     path="$TEMPLATES_DIR/$tmpl"
 
     # No trailing whitespace on lines (formatting hygiene)
-    trailing="$(grep -cnE '[[:space:]]$' "$path" || echo 0)"
+    trailing="$(grep -cE '[[:space:]]$' "$path" || true)"
+    [[ -z "$trailing" ]] && trailing=0
     # This is advisory — not a hard fail
     if [[ "$trailing" -le 5 ]]; then
         _record_pass "template $tmpl: minimal trailing whitespace ($trailing lines)"
@@ -317,7 +318,8 @@ for tmpl in $EXPECTED_TEMPLATES; do
     fi
 
     # No broken markdown links [text](broken)
-    broken_links="$(grep -cE '\[.*\]\(\s*\)' "$path" || echo 0)"
+    broken_links="$(grep -cE '\[.*\]\(\s*\)' "$path" || true)"
+    [[ -z "$broken_links" ]] && broken_links=0
     if [[ "$broken_links" -eq 0 ]]; then
         _record_pass "template $tmpl: no broken links"
     else

@@ -73,11 +73,12 @@ assert_eq "0" "$sync_rc" "sync: exits 0"
 # Binaries directory should have content
 assert_dir_exists "$LAB/tools/binaries" "sync: binaries/ exists"
 
-# Check that at least one binary was synced (chisel is the default manifest entry)
-if find "$LAB/tools/binaries" -type f 2>/dev/null | head -1 | grep -q .; then
-    _record_pass "sync: at least one file downloaded"
+# Check that at least one binary is present after sync.
+sync_file_count="$(find "$LAB/tools/binaries" -type f 2>/dev/null | wc -l)"
+if [[ "$sync_file_count" -gt 0 ]]; then
+    _record_pass "sync: at least one file present after sync"
 else
-    _record_fail "sync: at least one file downloaded" "empty" "files in binaries/"
+    _record_fail "sync: at least one file present after sync" "empty" "files in binaries/"
 fi
 
 # ═══════════════════════════════════════════════════════════════════

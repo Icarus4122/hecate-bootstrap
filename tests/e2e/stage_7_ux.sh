@@ -74,15 +74,19 @@ done
 section "Error Messages"
 
 # Unknown command
-unk_out="$(bash "$REPO_ROOT/labctl" nonexistent-cmd 2>&1)" || true
+set +e
+unk_out="$(bash "$REPO_ROOT/labctl" nonexistent-cmd 2>&1)"
 unk_rc=$?
+set -e
 assert_eq "1" "$unk_rc" "unknown cmd: exits 1"
 assert_contains "$unk_out" "Unknown command" "unknown cmd: says 'Unknown command'"
 assert_contains "$unk_out" "labctl help" "unknown cmd: points to help"
 
 # Bad help topic
-bad_help_out="$(bash "$REPO_ROOT/labctl" help nonexistent-topic 2>&1)" || true
+set +e
+bad_help_out="$(bash "$REPO_ROOT/labctl" help nonexistent-topic 2>&1)"
 bad_help_rc=$?
+set -e
 assert_eq "1" "$bad_help_rc" "bad help topic: exits 1"
 
 # ═══════════════════════════════════════════════════════════════════

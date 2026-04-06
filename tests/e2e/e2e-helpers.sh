@@ -500,8 +500,10 @@ assert_idempotent() {
     local label="$1"; shift
 
     local out1 rc1 out2 rc2
-    out1="$("$@" 2>&1)" || true; rc1=$?
-    out2="$("$@" 2>&1)" || true; rc2=$?
+    set +e
+    out1="$("$@" 2>&1)"; rc1=$?
+    out2="$("$@" 2>&1)"; rc2=$?
+    set -e
 
     if [[ $rc1 -eq $rc2 ]]; then
         _record_pass "$label: same exit code ($rc1)"
@@ -522,7 +524,9 @@ assert_idempotent() {
 assert_reentry() {
     local label="$1"; shift
     local out rc
-    out="$("$@" 2>&1)" || true; rc=$?
+    set +e
+    out="$("$@" 2>&1)"; rc=$?
+    set -e
 
     if [[ $rc -eq 0 ]]; then
         _record_pass "$label: exits 0 on re-entry"
@@ -690,10 +694,14 @@ run_compose() {
 # Usage: assert_dual_compose "label" config --services
 assert_dual_compose() {
     local label="$1"; shift
+    local available=0
     # Plugin variant
     if docker compose version &>/dev/null 2>&1; then
+        available=1
         local out1 rc1
-        out1="$(docker compose "$@" 2>&1)" || true; rc1=$?
+        set +e
+        out1="$(docker compose "$@" 2>&1)"; rc1=$?
+        set -e
         if [[ $rc1 -eq 0 ]]; then
             _record_pass "$label (docker compose)"
         else
@@ -704,8 +712,11 @@ assert_dual_compose() {
     fi
     # Legacy variant
     if command -v docker-compose &>/dev/null; then
+        available=1
         local out2 rc2
-        out2="$(docker-compose "$@" 2>&1)" || true; rc2=$?
+        set +e
+        out2="$(docker-compose "$@" 2>&1)"; rc2=$?
+        set -e
         if [[ $rc2 -eq 0 ]]; then
             _record_pass "$label (docker-compose)"
         else
@@ -713,6 +724,11 @@ assert_dual_compose() {
         fi
     else
         _record_pass "$label (docker-compose): not available — skip"
+    fi
+
+    # Avoid false positives when both variants are missing.
+    if [[ $available -eq 0 ]]; then
+        _record_fail "$label (compose availability)" "no compose variant" "docker compose or docker-compose installed"
     fi
 }
 
@@ -777,38 +793,4 @@ assert_heading_order() {
         prev_line="$line_num"
     done
     [[ $all_ordered -eq 1 ]] && _record_pass "$label: heading order correct"
-}
-print_final_report() {
-    local total=$(( E2E_TOTAL_PASS + E2E_TOTAL_FAIL ))
-    local result
-    if [[ $E2E_STAGES_FAILED -eq 0 ]]; then
-        result="ALL STAGES PASSED"
-    else
-        result="VALIDATION FAILED"
-    fi
-
-    {
-        echo ""
-        echo "╔══════════════════════════════════════════════════════════════╗"
-        echo "║                     FINAL RESULTS                          ║"
-        echo "╚══════════════════════════════════════════════════════════════╝"
-        echo ""
-        echo "  Stages:      ${E2E_TOTAL_STAGES} total, ${E2E_STAGES_PASSED} passed, ${E2E_STAGES_FAILED} failed, ${E2E_STAGES_SKIPPED} skipped"
-        echo "  Assertions:  ${total} total, ${E2E_TOTAL_PASS} passed, ${E2E_TOTAL_FAIL} failed"
-        echo "  Duration:    $(date +%s) seconds from epoch"
-        echo ""
-        echo "  Result:      ${result}"
-        echo ""
-
-        if [[ ${#E2E_FAILED_ITEMS[@]} -gt 0 ]]; then
-            echo "  Failed items:"
-            for item in "${E2E_FAILED_ITEMS[@]}"; do
-                echo "    [✗] ${item}"
-            done
-            echo ""
-        fi
-
-        echo "  Report:      ${E2E_REPORT_FILE}"
-        echo ""
-    } | tee -a "$E2E_REPORT_FILE"
 }

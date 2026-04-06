@@ -15,8 +15,10 @@ begin_stage 1 "Bootstrap"
 # ═══════════════════════════════════════════════════════════════════
 section "Execute bootstrap-host.sh"
 
-bootstrap_out="$(bash "$REPO_ROOT/scripts/bootstrap-host.sh" 2>&1)" || true
+set +e
+bootstrap_out="$(bash "$REPO_ROOT/scripts/bootstrap-host.sh" 2>&1)"
 bootstrap_rc=$?
+set -e
 
 # Bootstrap should exit 0
 assert_eq "0" "$bootstrap_rc" "bootstrap: exits 0"
@@ -60,9 +62,11 @@ else
 fi
 
 if docker compose version &>/dev/null 2>&1; then
-    _record_pass "Docker: compose plugin installed"
+    _record_pass "Docker: compose available via plugin"
+elif command -v docker-compose &>/dev/null 2>&1; then
+    _record_pass "Docker: compose available via legacy docker-compose"
 else
-    _record_fail "Docker: compose plugin installed" "missing" "docker compose"
+    _record_fail "Docker: compose available" "missing" "docker compose or docker-compose"
 fi
 
 # ═══════════════════════════════════════════════════════════════════
