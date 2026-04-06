@@ -13,6 +13,13 @@ COMPOSE_DIR="$REPO/compose"
 PASS=0
 FAIL=0
 
+# Compose files reference env_file: ../.env — ensure it exists for config parsing.
+if [[ ! -f "$REPO/.env" ]]; then
+    cp "$REPO/.env.example" "$REPO/.env"
+    CREATED_ENV=1
+fi
+trap '[[ "${CREATED_ENV:-0}" -eq 1 ]] && rm -f "$REPO/.env"' EXIT
+
 pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
 fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1"; }
 

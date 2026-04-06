@@ -180,7 +180,10 @@ REPO_DIR="$saved_repo"
 #  10. Success messages: consistent "Next:" phrasing
 # ═══════════════════════════════════════════════════════════════════
 
-# cmd_up success (mock _compose to succeed + create .env)
+# cmd_up success (mock _compose to succeed + create .env in sandbox)
+saved_repo="$REPO_DIR"
+REPO_DIR="$SANDBOX/success-repo"
+mkdir -p "$REPO_DIR"
 touch "$REPO_DIR/.env"
 _compose() { return 0; }
 out="$(cmd_up 2>&1)"
@@ -196,6 +199,7 @@ assert_contains "$out" "Next:" "build success: has 'Next:' pointer"
 out="$(cmd_down 2>&1)"
 assert_contains "$out" "[✓]" "down success: has [✓] marker"
 assert_contains "$out" "intact" "down success: mentions data intact"
+REPO_DIR="$saved_repo"
 
 # ═══════════════════════════════════════════════════════════════════
 #  11. Failure messages: consistent [✗] + remediation
