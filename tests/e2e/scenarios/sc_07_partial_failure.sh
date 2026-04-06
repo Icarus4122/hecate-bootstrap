@@ -23,8 +23,10 @@ section "Fault 1 — Missing .env"
 
 inject_fault "rename_file" "$REPO_ROOT/.env"
 
-env_out="$(bash "$REPO_ROOT/labctl" up 2>&1)" || true
+set +e
+env_out="$(bash "$REPO_ROOT/labctl" up 2>&1)"
 env_rc=$?
+set -e
 
 # Should fail with actionable error, not crash
 if [[ $env_rc -ne 0 ]]; then
@@ -40,8 +42,10 @@ assert_output_quality "$env_out" "missing .env output" \
 restore_fault "rename_file" "$REPO_ROOT/.env"
 
 # Recovery: up should work again
-recovery_out="$(bash "$REPO_ROOT/labctl" up 2>&1)" || true
+set +e
+recovery_out="$(bash "$REPO_ROOT/labctl" up 2>&1)"
 recovery_rc=$?
+set -e
 assert_eq "0" "$recovery_rc" "env recovery: up exits 0"
 assert_container_running "lab-kali" "env recovery: running"
 
@@ -52,17 +56,22 @@ inject_fault "stop_container" "lab-kali"
 assert_container_stopped "lab-kali" "kill: container stopped"
 
 # Status should report the issue
-status_out="$(bash "$REPO_ROOT/labctl" status 2>&1)" || true
+set +e
+status_out="$(bash "$REPO_ROOT/labctl" status 2>&1)"
+status_rc=$?
+set -e
 # Status should not crash
-if [[ $? -le 1 ]]; then
+if [[ $status_rc -le 1 ]]; then
     _record_pass "kill: status does not crash"
 else
-    _record_fail "kill: status crash" "exit $?" "exit 0 or 1"
+    _record_fail "kill: status crash" "exit $status_rc" "exit 0 or 1"
 fi
 
 # Up should recover
-up_out="$(bash "$REPO_ROOT/labctl" up 2>&1)" || true
+set +e
+up_out="$(bash "$REPO_ROOT/labctl" up 2>&1)"
 up_rc=$?
+set -e
 assert_eq "0" "$up_rc" "kill recovery: up exits 0"
 assert_container_running "lab-kali" "kill recovery: running again"
 
@@ -71,14 +80,16 @@ section "Fault 3 — Corrupted Manifest"
 
 inject_fault "break_manifest" "$REPO_ROOT/manifests/binaries.tsv"
 
-sync_out="$(bash "$REPO_ROOT/labctl" sync 2>&1)" || true
+set +e
+sync_out="$(bash "$REPO_ROOT/labctl" sync 2>&1)"
 sync_rc=$?
+set -e
 
 # Sync should fail gracefully, not crash
 if [[ $sync_rc -ne 0 ]]; then
     _record_pass "corrupt manifest: sync exits non-zero ($sync_rc)"
 else
-    _record_pass "corrupt manifest: sync handled gracefully (exit 0)"
+    _record_fail "corrupt manifest: sync should fail" "exit 0" "non-zero"
 fi
 
 # Should not produce a stack trace
@@ -91,8 +102,10 @@ fi
 restore_fault "break_manifest" "$REPO_ROOT/manifests/binaries.tsv"
 
 # Recovery: sync should work
-sync_recovery_out="$(bash "$REPO_ROOT/labctl" sync 2>&1)" || true
+set +e
+sync_recovery_out="$(bash "$REPO_ROOT/labctl" sync 2>&1)"
 sync_recovery_rc=$?
+set -e
 assert_eq "0" "$sync_recovery_rc" "manifest recovery: sync exits 0"
 
 # ── Fault 4: Missing compose file → build fails cleanly ───────────
@@ -100,8 +113,10 @@ section "Fault 4 — Missing Compose File"
 
 inject_fault "rename_file" "$REPO_ROOT/compose/docker-compose.yml"
 
-build_out="$(bash "$REPO_ROOT/labctl" build 2>&1)" || true
+set +e
+build_out="$(bash "$REPO_ROOT/labctl" build 2>&1)"
 build_rc=$?
+set -e
 
 if [[ $build_rc -ne 0 ]]; then
     _record_pass "missing compose: build exits non-zero"
@@ -124,8 +139,10 @@ section "Fault 5 — Bad Data Directory Permissions"
 inject_fault "break_permission" "$LAB/data"
 
 # Up should still work (bind mount from host, container runs as root)
-perm_up_out="$(bash "$REPO_ROOT/labctl" up 2>&1)" || true
+set +e
+perm_up_out="$(bash "$REPO_ROOT/labctl" up 2>&1)"
 perm_up_rc=$?
+set -e
 # This might or might not fail depending on implementation
 if [[ $perm_up_rc -eq 0 ]]; then
     _record_pass "bad perms: up still works"
@@ -143,8 +160,10 @@ bash "$REPO_ROOT/labctl" down &>/dev/null
 bash "$REPO_ROOT/labctl" up &>/dev/null
 assert_container_running "lab-kali" "post-recovery: container running"
 
-verify_out="$(bash "$REPO_ROOT/labctl" verify 2>&1)" || true
+set +e
+verify_out="$(bash "$REPO_ROOT/labctl" verify 2>&1)"
 verify_rc=$?
+set -e
 assert_eq "0" "$verify_rc" "post-recovery: verify passes"
 
 bash "$REPO_ROOT/labctl" down &>/dev/null

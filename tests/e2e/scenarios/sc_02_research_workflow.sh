@@ -27,8 +27,10 @@ assert_eq "1" "$([[ -d "$LAB/workspaces/$TOPIC" ]] && echo 0 || echo 1)" \
 # ── Step 1: Launch research workflow ───────────────────────────────
 section "Step 1 — Launch Research"
 
-launch_out="$(bash "$REPO_ROOT/labctl" launch research "$TOPIC" 2>&1)" || true
+set +e
+launch_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch research "$TOPIC" 2>&1)"
 launch_rc=$?
+set -e
 assert_eq "0" "$launch_rc" "launch research: exits 0"
 
 # Workspace created with research profile dirs
@@ -72,8 +74,10 @@ assert_contains "$host_content" "CVE-2024" "work: content correct"
 # ── Step 3: Re-entry ──────────────────────────────────────────────
 section "Step 3 — Re-entry"
 
-reentry_out="$(bash "$REPO_ROOT/labctl" launch research "$TOPIC" 2>&1)" || true
+set +e
+reentry_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch research "$TOPIC" 2>&1)"
 reentry_rc=$?
+set -e
 assert_eq "0" "$reentry_rc" "re-entry: exits 0"
 
 # Data persists

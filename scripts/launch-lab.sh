@@ -9,6 +9,10 @@
 #   launch-lab.sh htb <target>
 #   launch-lab.sh build [name]
 #   launch-lab.sh research [topic]
+#
+# Non-interactive mode:
+#   Set LAB_LAUNCH_NO_ATTACH=1 to create workspace/start containers
+#   without attaching to tmux (useful for automation and test harnesses).
 set -euo pipefail
 
 # ── Paths ──────────────────────────────────────────────────────────────────────
@@ -45,6 +49,13 @@ EOF
 # ── Helpers ────────────────────────────────────────────────────────────────────
 die()  { echo "[✗] $*" >&2; exit 1; }
 info() { echo "[*] $*"; }
+
+_should_attach() {
+    if [[ "${LAB_LAUNCH_NO_ATTACH:-0}" == "1" ]]; then
+        return 1
+    fi
+    [[ -t 0 && -t 1 ]]
+}
 
 # ── Session naming ─────────────────────────────────────────────────────────────
 # Produces a deterministic, collision-free tmux session name.
@@ -205,8 +216,13 @@ launch_default() {
     _has_tmux_session "$session" && reattach=true
 
     _print_summary default "" "$session" "$reattach"
-    info "Entering kali-main..."
-    enter_kali default.sh "$session"
+    if _should_attach; then
+        info "Entering kali-main..."
+        enter_kali default.sh "$session"
+    else
+        echo "[✓] Launch completed (non-interactive mode)."
+        echo "    Reattach later: labctl launch default"
+    fi
 }
 
 # ── Profile: htb ──────────────────────────────────────────────────────────────
@@ -228,8 +244,13 @@ launch_htb() {
     _has_tmux_session "$session" && reattach=true
 
     _print_summary htb "$target" "$session" "$reattach"
-    info "Entering kali-main..."
-    enter_kali htb.sh "$session" "/opt/lab/workspaces/${target}"
+    if _should_attach; then
+        info "Entering kali-main..."
+        enter_kali htb.sh "$session" "/opt/lab/workspaces/${target}"
+    else
+        echo "[✓] Launch completed (non-interactive mode)."
+        echo "    Reattach later: labctl launch htb ${target}"
+    fi
 }
 
 # ── Profile: build ────────────────────────────────────────────────────────────
@@ -252,12 +273,20 @@ launch_build() {
     _has_tmux_session "$session" && reattach=true
 
     _print_summary build "$name" "$session" "$reattach"
-    info "Entering kali-main..."
-
-    if [[ -n "$ws_arg" ]]; then
-        enter_kali build.sh "$session" "$ws_arg"
+    if _should_attach; then
+        info "Entering kali-main..."
+        if [[ -n "$ws_arg" ]]; then
+            enter_kali build.sh "$session" "$ws_arg"
+        else
+            enter_kali build.sh "$session"
+        fi
     else
-        enter_kali build.sh "$session"
+        echo "[✓] Launch completed (non-interactive mode)."
+        if [[ -n "$name" ]]; then
+            echo "    Reattach later: labctl launch build ${name}"
+        else
+            echo "    Reattach later: labctl launch build"
+        fi
     fi
 }
 
@@ -278,12 +307,20 @@ launch_research() {
     _has_tmux_session "$session" && reattach=true
 
     _print_summary research "$topic" "$session" "$reattach"
-    info "Entering kali-main..."
-
-    if [[ -n "$ws_arg" ]]; then
-        enter_kali research.sh "$session" "$ws_arg"
+    if _should_attach; then
+        info "Entering kali-main..."
+        if [[ -n "$ws_arg" ]]; then
+            enter_kali research.sh "$session" "$ws_arg"
+        else
+            enter_kali research.sh "$session"
+        fi
     else
-        enter_kali research.sh "$session"
+        echo "[✓] Launch completed (non-interactive mode)."
+        if [[ -n "$topic" ]]; then
+            echo "    Reattach later: labctl launch research ${topic}"
+        else
+            echo "    Reattach later: labctl launch research"
+        fi
     fi
 }
 

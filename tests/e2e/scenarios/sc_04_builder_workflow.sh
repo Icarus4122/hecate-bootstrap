@@ -23,8 +23,10 @@ bash "$REPO_ROOT/labctl" down &>/dev/null || true
 # ── Step 1: Launch builder workflow ────────────────────────────────
 section "Step 1 — Launch Builder"
 
-launch_out="$(bash "$REPO_ROOT/labctl" launch build "$WS_NAME" 2>&1)" || true
+set +e
+launch_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch build "$WS_NAME" 2>&1)"
 launch_rc=$?
+set -e
 assert_eq "0" "$launch_rc" "launch build: exits 0"
 
 # Both containers should be running
@@ -54,8 +56,10 @@ int main() { printf(\"hello from builder\\n\"); return 0; }
 EOF" 2>/dev/null
 
 # Compile
-compile_out="$(docker exec lab-builder bash -c "gcc -o $WS/out/hello $WS/src/hello.c" 2>&1)" || true
+set +e
+compile_out="$(docker exec lab-builder bash -c "gcc -o $WS/out/hello $WS/src/hello.c" 2>&1)"
 compile_rc=$?
+set -e
 assert_eq "0" "$compile_rc" "compile: gcc exits 0"
 assert_container_path "lab-builder" "$WS/out/hello" "compile: binary exists in builder"
 
@@ -66,7 +70,11 @@ section "Step 3 — Cross-Container Access"
 assert_container_path "lab-kali" "$WS/out/hello" "cross: binary visible in kali"
 
 # Execute from kali
-run_out="$(docker exec lab-kali "$WS/out/hello" 2>&1)" || true
+set +e
+run_out="$(docker exec lab-kali "$WS/out/hello" 2>&1)"
+run_rc=$?
+set -e
+assert_eq "0" "$run_rc" "cross: binary executes in kali"
 assert_contains "$run_out" "hello from builder" "cross: binary runs in kali"
 
 # Verify on host too
@@ -80,6 +88,14 @@ assert_docker_mount "lab-builder" "$LAB/tools" "/opt/lab/tools" "rw" \
     "inspect: builder tools mount"
 assert_docker_mount "lab-builder" "$LAB/workspaces" "/opt/lab/workspaces" "rw" \
     "inspect: builder workspaces mount"
+assert_docker_mount "lab-builder" "$LAB/data" "/opt/lab/data" "rw" \
+    "inspect: builder data mount"
+assert_docker_mount "lab-builder" "$LAB/resources" "/opt/lab/resources" "rw" \
+    "inspect: builder resources mount"
+assert_docker_mount "lab-builder" "$LAB/knowledge" "/opt/lab/knowledge" "rw" \
+    "inspect: builder knowledge mount"
+assert_docker_mount "lab-builder" "$LAB/templates" "/opt/lab/templates" "rw" \
+    "inspect: builder templates mount"
 
 # Builder should have gcc, make available
 assert_container_cmd "lab-builder" "builder: has gcc" which gcc

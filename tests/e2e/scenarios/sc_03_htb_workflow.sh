@@ -25,8 +25,10 @@ assert_eq "1" "$([[ -d "$LAB/workspaces/$TARGET" ]] && echo 0 || echo 1)" \
 # ── Step 1: Launch HTB target ──────────────────────────────────────
 section "Step 1 — Launch HTB"
 
-launch_out="$(bash "$REPO_ROOT/labctl" launch htb "$TARGET" 2>&1)" || true
+set +e
+launch_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch htb "$TARGET" 2>&1)"
 launch_rc=$?
+set -e
 assert_eq "0" "$launch_rc" "launch htb: exits 0"
 
 assert_dir_exists "$LAB/workspaces/$TARGET" "launch: workspace created"
@@ -93,8 +95,10 @@ assert_file_exists "$LAB/workspaces/$TARGET/scans/nmap-initial.txt" "restart: sc
 assert_file_exists "$LAB/workspaces/$TARGET/creds/found.txt" "restart: creds persist"
 
 # Re-launch — should detect existing workspace
-relaunch_out="$(bash "$REPO_ROOT/labctl" launch htb "$TARGET" 2>&1)" || true
+set +e
+relaunch_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch htb "$TARGET" 2>&1)"
 relaunch_rc=$?
+set -e
 assert_eq "0" "$relaunch_rc" "re-launch: exits 0"
 
 # Container should have data
@@ -107,8 +111,10 @@ section "Step 4 — Second Target"
 TARGET2="sandworm"
 rm -rf "$LAB/workspaces/$TARGET2" 2>/dev/null
 
-launch2_out="$(bash "$REPO_ROOT/labctl" launch htb "$TARGET2" 2>&1)" || true
+set +e
+launch2_out="$(LAB_LAUNCH_NO_ATTACH=1 bash "$REPO_ROOT/labctl" launch htb "$TARGET2" 2>&1)"
 launch2_rc=$?
+set -e
 assert_eq "0" "$launch2_rc" "second target: exits 0"
 
 assert_dir_exists "$LAB/workspaces/$TARGET2" "second: workspace created"

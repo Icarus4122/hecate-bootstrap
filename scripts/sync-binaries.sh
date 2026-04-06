@@ -202,8 +202,15 @@ process_entry() {
                 echo "    [*] ${asset_count} asset(s) in release"
 
                 local -a lines
-                a_info="$(printf '%s' "$json" | jq -r --arg pat "$mode" \
-                    '.assets[] | select(.name == $pat) | [.name, .browser_download_url, (.size | tostring)] | @tsv')"
+                mapfile -t lines < <(printf '%s' "$json" | jq -r \
+                    '.assets[] | [.name, .browser_download_url, (.size | tostring)] | @tsv')
+
+                if [[ ${#lines[@]} -eq 0 ]]; then
+                    echo "    [✗] Release has no downloadable assets"
+                    ERRORS=$((ERRORS + 1))
+                    return
+                fi
+
                 for line in "${lines[@]}"; do
                     [[ -z "$line" ]] && continue
                     local a_name a_url a_size
