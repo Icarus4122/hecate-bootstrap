@@ -93,16 +93,36 @@ else
     fail "apt-host.txt: only ${pkg_count} packages (expected >5)"
 fi
 
-data_line="$(grep -v '^#' "$REPO/manifests/binaries.tsv" | grep -v '^[[:space:]]*$' | head -1)"
-if [[ -n "$data_line" ]]; then
-    field_count="$(echo "$data_line" | awk -F'\t' '{print NF}')"
-    if [[ "$field_count" -ge 6 ]]; then
-        pass "binaries.tsv: ${field_count} columns"
-    else
-        fail "binaries.tsv: ${field_count} columns (expected >=6)"
+# binaries.tsv: validate every real data row, ignoring comments / blanks /
+# header. Header is recognised by its first column being literally "name".
+# Each real row must have >=7 tab-separated fields (name, type, repo, tag,
+# mode, dest, flags).
+declare -i bin_data_rows=0
+declare -i bin_bad_rows=0
+declare -i bin_lineno=0
+while IFS= read -r line; do
+    bin_lineno=$((bin_lineno + 1))
+    # Strip comments and blank lines.
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "${line//[[:space:]]/}" ]] && continue
+    # Skip header row (first column is literally "name").
+    first="${line%%$'\t'*}"
+    if [[ "$first" == "name" ]]; then
+        continue
     fi
-else
-    fail "binaries.tsv: no data lines"
+    bin_data_rows=$((bin_data_rows + 1))
+    # Validate field count.
+    fc="$(awk -F'\t' '{print NF}' <<< "$line")"
+    if [[ "$fc" -lt 7 ]]; then
+        bin_bad_rows=$((bin_bad_rows + 1))
+        fail "binaries.tsv: row ${bin_lineno} has ${fc} fields (expected >=7)"
+    fi
+done < "$REPO/manifests/binaries.tsv"
+
+if [[ $bin_data_rows -eq 0 ]]; then
+    fail "binaries.tsv: no real data rows (only header / comments)"
+elif [[ $bin_bad_rows -eq 0 ]]; then
+    pass "binaries.tsv: ${bin_data_rows} data row(s), all well-formed"
 fi
 
 # Summary

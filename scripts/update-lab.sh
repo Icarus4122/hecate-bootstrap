@@ -288,7 +288,12 @@ step_summary() {
         echo "  Result: Update complete."
     fi
     echo ""
-    echo "  ${LAB_ROOT} was not modified by this script."
+    if [[ "$OPT_EMPUSA" == "1" || "$OPT_BINARIES" == "1" ]]; then
+        echo "  Runtime data and workspaces under ${LAB_ROOT} were not modified;"
+        echo "  tooling under ${LAB_ROOT}/tools may have been updated."
+    else
+        echo "  ${LAB_ROOT} runtime data was not modified by this script."
+    fi
 
     ui_next_block \
         "labctl status                  Check running services" \

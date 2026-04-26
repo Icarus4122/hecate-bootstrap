@@ -24,12 +24,22 @@ jobs:
 
       - name: ShellCheck lint
         run: |
-          shellcheck --severity=error --shell=bash \
-            labctl \
-            scripts/*.sh \
-            scripts/lib/*.sh \
-            tests/helpers.sh \
+          shopt -s nullglob
+          targets=(
+            labctl
+            scripts/*.sh
+            scripts/lib/*.sh
+            scripts/dev/*.sh
+            tests/helpers.sh
             tests/run-all.sh
+            tests/test_*.sh
+            tests/e2e/e2e-helpers.sh
+            tests/e2e/run-validation.sh
+            tests/e2e/stage_*.sh
+            tests/e2e/scenarios/*.sh
+            tmux/profiles/*.sh
+          )
+          shellcheck --severity=error --shell=bash "${targets[@]}"
 
   shell-tests:
     name: Shell tests

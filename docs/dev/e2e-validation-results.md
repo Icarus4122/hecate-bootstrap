@@ -49,7 +49,7 @@ These behaviours are **documented contracts** — fail-loudly, machine-parseable
 | Hecate dev/CI sanity | `bash scripts/dev/ci-syntax-check.sh && bash scripts/dev/ci-repo-integrity.sh && bash scripts/dev/ci-compose-lint.sh` | each ends with `[PASS]` line and exit 0 |
 | Hecate cross-repo contract | `bash scripts/dev/ci-contract-check.sh ../empusa` | `[PASS]` lines for all of: PROFILES present, htb dirs exact, ALL_EVENTS contains workspace events, CLI entry resolves |
 | Hecate release-sanity (against Empusa) | `bash scripts/dev/release-sanity.sh ../empusa` | `[PASS] version 2.3.0 consistent` + `[PASS] [2.3.0] in CHANGELOG.md` |
-| Hecate e2e (Linux + Docker) | `tests/e2e/run-e2e.sh` (or per-stage) | stages 0–7 pass; stage 5 conditional on local Empusa source |
+| Hecate e2e (Linux + Docker) | `bash tests/e2e/run-validation.sh` (or per-stage) | stages 0–7 pass; stage 5 conditional on local Empusa source |
 | Empusa lint | `ruff check empusa/ tests/` | clean |
 | Empusa unit + integration | `pytest -q` | green |
 
@@ -73,7 +73,7 @@ bash scripts/dev/release-sanity.sh ../empusa
 bash tests/run-all.sh
 bash tests/test_output_style.sh
 # E2E (requires Docker + Empusa installed):
-bash tests/e2e/run-e2e.sh        # if present, otherwise per-stage scripts
+bash tests/e2e/run-validation.sh   # requires Docker + Empusa installed
 ```
 
 If all of the above succeed, both repos are tag-ready:

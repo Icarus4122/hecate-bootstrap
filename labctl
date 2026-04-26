@@ -42,10 +42,11 @@ cmd_up() {
     fi
 
     local profiles=()
+    local hostnet_requested=0
     while [[ $# -gt 0 ]]; do
         case "$1" in
             --gpu)      export LAB_GPU=1;      shift ;;
-            --hostnet)  export LAB_HOSTNET=1;   shift ;;
+            --hostnet)  export LAB_HOSTNET=1; hostnet_requested=1; shift ;;
             --builder)  profiles+=(--profile build); shift ;;
             *)
                 ui_fail "Unknown flag: $1"
@@ -53,6 +54,11 @@ cmd_up() {
                 return 1 ;;
         esac
     done
+    if [[ "$hostnet_requested" == "1" ]]; then
+        ui_warn "Host networking enabled (--hostnet)"
+        ui_note "Containers share the host network namespace."
+        ui_note "Use only when VPN/tun0 access from inside the container is required."
+    fi
     if ! _compose "${profiles[@]}" up -d; then
         ui_error_block \
             "Compose failed to start the lab" \
@@ -144,10 +150,10 @@ cmd_tmux() {
     local profile="${1:-}"
     if [[ -z "$profile" ]]; then
         echo "Available tmux profiles:"
-        for f in "$REPO_DIR"/tmux/profiles/*.sh; do
-            [[ -e "$f" ]] || continue
-            basename "$f" .sh
-        done
+        echo "  default     General operator session"
+        echo "  htb         HTB/CTF workspace session"
+        echo "  build       Build/tooling sidecar workflow"
+        echo "  research    Research/notes workflow"
         return 0
     fi
     local script="$REPO_DIR/tmux/profiles/${profile}.sh"
@@ -300,13 +306,15 @@ cmd_update() {
 }
 
 cmd_clean() {
-    ui_warn "This removes containers, volumes, and dangling images."
-    ui_note "$LAB_ROOT is NOT affected."
+    ui_warn "This removes Compose-managed containers and named volumes,"
+    ui_note "and prunes dangling Docker images."
+    ui_note "${LAB_ROOT} bind-mounted runtime data is NOT removed."
+    ui_note "Note: any future named volumes added to Compose would also be removed."
     read -rp "    Proceed? [y/N] " ans
     if [[ "$ans" =~ ^[Yy]$ ]]; then
         _compose down -v --remove-orphans
         docker image prune -f
-        ui_pass "Cleaned.  Data in ${LAB_ROOT} is intact."
+        ui_pass "Cleaned.  Bind-mounted data in ${LAB_ROOT} is intact."
         ui_next_block "labctl build" "labctl up"
     else
         ui_info "Aborted."
@@ -752,10 +760,15 @@ cmd_help_clean() {
     cat <<'HELP'
 labctl clean
 
-  Interactive cleanup.  Removes containers and volumes managed by this
-  project, then prunes dangling Docker images.
+  Interactive cleanup.  Removes Compose-managed containers and named
+  volumes for this project, then prunes dangling Docker images.
 
-  /opt/lab is NEVER touched.  Your workspaces, tools, and data are safe.
+  Bind-mounted runtime data under /opt/lab is NOT removed — your
+  workspaces, tools, binaries, and saved data are safe.
+
+  Note: any future named volumes added to Compose would also be removed
+  by this command.  Today the project uses bind mounts only, but this is
+  worth knowing if compose volumes are ever introduced.
 
   You will be prompted before anything is deleted.
 

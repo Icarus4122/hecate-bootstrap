@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# tests/test_ceate_wokspace.sh - Tests for scripts/create-workspace.sh.
+# tests/test_create_workspace.sh - Tests for scripts/create-workspace.sh.
 #
 # We test the shell fallback path (no Empusa installed) by running
 # the script directly with a sandboxed LAB_ROOT.
