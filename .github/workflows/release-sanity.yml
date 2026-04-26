@@ -49,9 +49,37 @@ jobs:
       - name: Install Empusa + dev deps
         run: pip install -e ./empusa[dev]
 
-      - name: Run release-sanity.sh
+      - name: Run release-sanity.sh (strict)
         env:
           EMPUSA_SRC: ${{ github.workspace }}/empusa
+          # Release-grade gates. Strict checksum is the default in
+          # release-sanity.sh whenever RELEASE_SANITY_SKIP_CHECKSUMS is unset;
+          # the env var is exported here to make the intent explicit and to
+          # propagate into nested Empusa invocations.
+          STRICT_CHECKSUMS: "1"
+          STRICT_MODULES: "1"
+          STRICT_TEMPLATES: "1"
         run: |
           cd hecate
           bash scripts/dev/release-sanity.sh
+
+      - name: Collect release evidence (strict)
+        env:
+          EMPUSA_SRC: ${{ github.workspace }}/empusa
+          STRICT_CHECKSUMS: "1"
+        run: |
+          cd hecate
+          mkdir -p build/release-evidence
+          ts="$(date -u +%Y%m%dT%H%M%SZ)"
+          bash scripts/dev/release-evidence.sh --strict \
+              --out "build/release-evidence/${ts}.txt" \
+              "${EMPUSA_SRC}"
+
+      - name: Upload release-evidence artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.run_id }}
+          path: hecate/build/release-evidence/
+          retention-days: 90
+          if-no-files-found: warn

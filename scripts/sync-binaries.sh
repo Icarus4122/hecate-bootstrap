@@ -24,6 +24,9 @@ FILTER=""
 ERRORS=0
 SYNCED=0
 SKIPPED=0
+# Strict mode: TODO_SHA256 (unpinned) entries fail before download.
+# Either the env var STRICT_CHECKSUMS=1 or the --strict-checksums flag enables it.
+STRICT_CHECKSUMS="${STRICT_CHECKSUMS:-0}"
 
 # ── Usage ──────────────────────────────────────────────────────────────────────
 usage() {
@@ -34,13 +37,15 @@ Download pinned external binaries listed in manifests/binaries.tsv
 into ${LAB_ROOT}/tools/binaries/.
 
 Options:
-  -n, --name NAME   Sync only the named manifest entry
-  --dry-run         Preview what would be downloaded (no writes)
-  -h, --help        Show this help
+  -n, --name NAME       Sync only the named manifest entry
+  --dry-run             Preview what would be downloaded (no writes)
+  --strict-checksums    Fail on any TODO_SHA256 entry (release-grade sync)
+  -h, --help            Show this help
 
 Environment:
-  LAB_ROOT          Base lab directory       (default: /opt/lab)
-  GITHUB_TOKEN      GitHub PAT - raises API rate limit from 60 to 5 000 req/h
+  LAB_ROOT              Base lab directory       (default: /opt/lab)
+  GITHUB_TOKEN          GitHub PAT - raises API rate limit from 60 to 5 000 req/h
+  STRICT_CHECKSUMS=1    Same as --strict-checksums
 EOF
     exit 0
 }
@@ -52,6 +57,7 @@ while [[ $# -gt 0 ]]; do
             [[ -z "${2:-}" ]] && { ui_fail "--name requires an argument"; exit 1; }
             FILTER="$2"; shift 2 ;;
         --dry-run) DRY_RUN=true; shift ;;
+        --strict-checksums) STRICT_CHECKSUMS=1; shift ;;
         -h|--help) usage ;;
         *) ui_fail "Unknown option: $1"; exit 1 ;;
     esac
@@ -59,7 +65,7 @@ done
 
 # ── Dependency check ──────────────────────────────────────────────────────────
 missing=()
-for cmd in curl jq file; do
+for cmd in curl jq file sha256sum gunzip; do
     command -v "$cmd" &>/dev/null || missing+=("$cmd")
 done
 if [[ ${#missing[@]} -gt 0 ]]; then
@@ -171,18 +177,98 @@ download_one() {
     return 0
 }
 
+# ── Checksum verification ──────────────────────────────────────────────────────
+# Verify a file against an expected lowercase-hex SHA256 digest.
+#   $1 = path  $2 = expected sha256
+# Returns 0 on match, 1 on mismatch.  Caller is responsible for cleanup.
+verify_sha256() {
+    local fpath="$1" expected="$2"
+    local actual
+    actual="$(sha256sum "$fpath" 2>/dev/null | awk '{print $1}')"
+    if [[ -z "$actual" ]]; then
+        echo "    [FAIL] sha256sum failed on ${fpath}"
+        return 1
+    fi
+    if [[ "$actual" != "$expected" ]]; then
+        echo "    [FAIL] checksum mismatch"
+        echo "       expected: ${expected}"
+        echo "       actual:   ${actual}"
+        return 1
+    fi
+    return 0
+}
+
 # ── File size (bytes) ──────────────────────────────────────────────────────────
 file_size() { stat --format='%s' "$1" 2>/dev/null; }
 
+# ── Post-download extraction for single-asset .gz artifacts ────────────────────
+# Decompresses <name>.gz alongside the verified archive into <name> and marks
+# the result executable.  Preserves the original .gz so the verified artifact
+# remains for audit/re-extraction.
+#
+# Contract:
+#   - Caller guarantees the .gz has already passed sha256 verification.
+#   - Returns 0 on success, 1 on failure.  On failure, removes any partial
+#     decompressed output (the .gz is left untouched — caller decides).
+#   $1 = path to the verified .gz file
+extract_gz_asset() {
+    local gz_path="$1"
+    local out_path="${gz_path%.gz}"
+
+    if [[ "$gz_path" == "$out_path" ]]; then
+        echo "    [FAIL] extract_gz_asset called on non-.gz path: ${gz_path}"
+        return 1
+    fi
+
+    # gunzip -c keeps the .gz intact and writes plain bytes to stdout.
+    if ! gunzip -c -- "$gz_path" > "$out_path" 2>/dev/null; then
+        echo "    [FAIL] decompression failed: ${gz_path##*/}"
+        rm -f "$out_path"
+        return 1
+    fi
+
+    if [[ ! -s "$out_path" ]]; then
+        echo "    [FAIL] decompression produced empty output: ${gz_path##*/}"
+        rm -f "$out_path"
+        return 1
+    fi
+
+    if ! chmod +x "$out_path" 2>/dev/null; then
+        echo "    [WARN] could not chmod +x ${out_path##*/} (filesystem may not support it)"
+    fi
+
+    echo "    [PASS] extracted ${gz_path##*/} -> ${out_path##*/}"
+    echo "    [PASS] marked executable ${out_path##*/}"
+    return 0
+}
+
 # ── Process one manifest entry ─────────────────────────────────────────────────
 process_entry() {
-    local name="$1" type="$2" repo="$3" tag="$4" mode="$5" dest="$6" flags="$7"
+    local name="$1" type="$2" repo="$3" tag="$4" mode="$5" dest="$6" flags="$7" sha256="${8:-TODO_SHA256}"
     local target_dir="${BIN_DIR}/${dest}"
 
     # Parse flags
     local allow_text=false make_exec=false
     [[ "$flags" == *allow-text* ]] && allow_text=true
     [[ "$flags" == *executable* ]] && make_exec=true
+
+    # ── Checksum-policy gate (applied before any download) ─────────────────
+    # all-assets rows produce N files; per-asset checksums are not supported
+    # in this pass.  Real sha256 on an all-assets row is a manifest error.
+    if [[ "$mode" == "all-assets" && "$sha256" != "TODO_SHA256" && "$sha256" != "-" ]]; then
+        echo "    [FAIL] ${name}: per-asset checksums not supported for mode=all-assets"
+        echo "       Pin individual artifacts by switching mode to an exact asset filename,"
+        echo "       or set sha256 to TODO_SHA256."
+        ERRORS=$((ERRORS + 1))
+        return
+    fi
+    # Strict mode: refuse any TODO_SHA256 entry up-front (no download attempted).
+    if [[ "$STRICT_CHECKSUMS" == "1" && "$sha256" == "TODO_SHA256" ]]; then
+        echo "    [FAIL] ${name}: checksum required for ${name} under strict mode"
+        echo "       Pin sha256 in manifests/binaries.tsv or drop --strict-checksums."
+        ERRORS=$((ERRORS + 1))
+        return
+    fi
 
     case "$type" in
         github-release)
@@ -195,6 +281,10 @@ process_entry() {
                 # Download every release asset into dest/.
                 # all-assets implies allow-text - checksums and signatures are expected.
                 local asset_allow_text=true
+
+                # all-assets always carries TODO_SHA256 at this point (real
+                # checksums were rejected by the gate above).  Warn once.
+                echo "    [WARN] checksum not pinned for ${name} (all-assets row)"
 
                 mkdir -p "$target_dir"
 
@@ -281,13 +371,49 @@ process_entry() {
 
                 if $DRY_RUN; then
                     echo "        -> ${a_dest}"
+                    if [[ "$sha256" == "TODO_SHA256" ]]; then
+                        echo "    [WARN] checksum not pinned for ${a_name}"
+                    else
+                        echo "    [INFO] would verify sha256=${sha256}"
+                    fi
+                    if [[ "$a_name" == *.gz ]]; then
+                        echo "    [INFO] would extract ${a_name} -> ${a_name%.gz} (chmod +x)"
+                    fi
                     return
                 fi
 
-                if download_one "$a_url" "$a_dest" "$allow_text" "$make_exec"; then
+                if ! download_one "$a_url" "$a_dest" "$allow_text" "$make_exec"; then
+                    ERRORS=$((ERRORS + 1))
+                    return
+                fi
+
+                # Checksum verification (or warn if unpinned).
+                if [[ "$sha256" == "TODO_SHA256" ]]; then
+                    echo "    [WARN] checksum not pinned for ${a_name}"
                     SYNCED=$((SYNCED + 1))
                 else
-                    ERRORS=$((ERRORS + 1))
+                    if verify_sha256 "$a_dest" "$sha256"; then
+                        echo "    [PASS] checksum verified for ${a_name}"
+                        SYNCED=$((SYNCED + 1))
+                    else
+                        rm -f "$a_dest"
+                        ERRORS=$((ERRORS + 1))
+                        return
+                    fi
+                fi
+
+                # Post-verification extraction for .gz single-asset archives.
+                # Runs only after checksum success (or unpinned WARN, since
+                # the file was still validated as a binary by file(1) and the
+                # operator opted into dev mode).  The .gz itself is preserved
+                # alongside the decompressed executable.
+                if [[ "$a_name" == *.gz ]]; then
+                    if ! extract_gz_asset "$a_dest"; then
+                        # Don't remove the .gz — it's still the verified
+                        # artifact and the operator may want to inspect it.
+                        ERRORS=$((ERRORS + 1))
+                        return
+                    fi
                 fi
             fi
             ;;
@@ -314,15 +440,17 @@ main() {
     echo ""
     ui_info "Syncing pinned binaries → ${BIN_DIR}"
     $DRY_RUN && ui_info "DRY-RUN — no files will be written"
+    [[ "$STRICT_CHECKSUMS" == "1" ]] && ui_info "STRICT_CHECKSUMS=1 — TODO_SHA256 entries will FAIL"
     echo ""
 
     local matched=0
 
-    while IFS=$'\t' read -r f_name f_type f_repo f_tag f_mode f_dest f_flags || [[ -n "${f_name:-}" ]]; do
+    while IFS=$'\t' read -r f_name f_type f_repo f_tag f_mode f_dest f_flags f_sha256 || [[ -n "${f_name:-}" ]]; do
         # Skip blanks, comments, header row.
         [[ -z "$f_name" || "$f_name" =~ ^[[:space:]]*# || "$f_name" == "name" ]] && continue
 
         f_flags="${f_flags:--}"
+        f_sha256="${f_sha256:-TODO_SHA256}"
 
         # Apply --name filter.
         if [[ -n "$FILTER" && "$f_name" != "$FILTER" ]]; then
@@ -330,7 +458,7 @@ main() {
         fi
 
         matched=$((matched + 1))
-        process_entry "$f_name" "$f_type" "$f_repo" "$f_tag" "$f_mode" "$f_dest" "$f_flags"
+        process_entry "$f_name" "$f_type" "$f_repo" "$f_tag" "$f_mode" "$f_dest" "$f_flags" "$f_sha256"
         echo ""
     done < "$MANIFEST"
 

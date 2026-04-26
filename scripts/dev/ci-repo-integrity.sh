@@ -95,10 +95,12 @@ fi
 
 # binaries.tsv: validate every real data row, ignoring comments / blanks /
 # header. Header is recognised by its first column being literally "name".
-# Each real row must have >=7 tab-separated fields (name, type, repo, tag,
-# mode, dest, flags).
+# Each real row must have >=8 tab-separated fields (name, type, repo, tag,
+# mode, dest, flags, sha256). The sha256 field may be a real lowercase hex
+# digest or the literal TODO_SHA256 sentinel (allowed in dev mode only).
 declare -i bin_data_rows=0
 declare -i bin_bad_rows=0
+declare -i bin_todo_rows=0
 declare -i bin_lineno=0
 while IFS= read -r line; do
     bin_lineno=$((bin_lineno + 1))
@@ -113,9 +115,18 @@ while IFS= read -r line; do
     bin_data_rows=$((bin_data_rows + 1))
     # Validate field count.
     fc="$(awk -F'\t' '{print NF}' <<< "$line")"
-    if [[ "$fc" -lt 7 ]]; then
+    if [[ "$fc" -lt 8 ]]; then
         bin_bad_rows=$((bin_bad_rows + 1))
-        fail "binaries.tsv: row ${bin_lineno} has ${fc} fields (expected >=7)"
+        fail "binaries.tsv: row ${bin_lineno} has ${fc} fields (expected >=8)"
+        continue
+    fi
+    # Inspect sha256 (8th field).
+    sha="$(awk -F'\t' '{print $8}' <<< "$line")"
+    if [[ "$sha" == "TODO_SHA256" ]]; then
+        bin_todo_rows=$((bin_todo_rows + 1))
+    elif [[ ! "$sha" =~ ^[0-9a-f]{64}$ ]]; then
+        bin_bad_rows=$((bin_bad_rows + 1))
+        fail "binaries.tsv: row ${bin_lineno} sha256 must be 64 lowercase hex chars or TODO_SHA256 (got '${sha}')"
     fi
 done < "$REPO/manifests/binaries.tsv"
 
@@ -123,6 +134,9 @@ if [[ $bin_data_rows -eq 0 ]]; then
     fail "binaries.tsv: no real data rows (only header / comments)"
 elif [[ $bin_bad_rows -eq 0 ]]; then
     pass "binaries.tsv: ${bin_data_rows} data row(s), all well-formed"
+fi
+if [[ $bin_todo_rows -gt 0 ]]; then
+    echo "  [WARN] binaries.tsv: ${bin_todo_rows} row(s) use TODO_SHA256 — pin real checksums for release-grade sync"
 fi
 
 # Summary

@@ -52,6 +52,11 @@ jobs:
       - name: Run contract tests
         env:
           EMPUSA_SRC: ${{ github.workspace }}/empusa
+          # Contract validation is a release-aligned check; surface any
+          # malformed module metadata or template gaps that Empusa would
+          # otherwise silently warn about.
+          STRICT_MODULES: "1"
+          STRICT_TEMPLATES: "1"
         run: |
           cd hecate
           bash tests/test_empusa_contract.sh
@@ -59,6 +64,8 @@ jobs:
       - name: Run contract validation script
         env:
           EMPUSA_SRC: ${{ github.workspace }}/empusa
+          STRICT_MODULES: "1"
+          STRICT_TEMPLATES: "1"
         run: |
           cd hecate
           bash scripts/dev/ci-contract-check.sh "${{ github.workspace }}/empusa"

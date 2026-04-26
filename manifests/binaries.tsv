@@ -1,5 +1,5 @@
 # manifests/binaries.tsv - Pinned external binaries.
-# Tab-separated: name  type  repo  tag  mode  dest  flags
+# Tab-separated: name  type  repo  tag  mode  dest  flags  sha256
 #
 # Columns:
 #   name    – human label (used with --name filter)
@@ -9,13 +9,45 @@
 #   mode    – "all-assets" to grab every file, or exact asset filename
 #   dest    – subdirectory under ${LAB_ROOT}/tools/binaries/
 #   flags   – dash for none; comma-separated: executable, allow-text
+#   sha256  – lowercase hex SHA256 of the downloaded artifact, or
+#             TODO_SHA256 when not yet pinned (dev-only)
+#
+# ── Checksum policy ──────────────────────────────────────────────────────────
+#   Real SHA256 values are required for release-grade sync.  TODO_SHA256 is
+#   accepted in default/dev mode (sync-binaries.sh prints a [WARN]) but FAILS
+#   under STRICT_CHECKSUMS=1 (or --strict-checksums).  Use strict mode for
+#   release validation.
+#
+#   Per-asset checksums are NOT supported for mode=all-assets.  For all-assets
+#   rows, sha256 must be TODO_SHA256; supplying a real hash for an all-assets
+#   row will FAIL with a clear error.  Pin individual artifacts by switching
+#   the row to mode=<exact-asset-filename>.
+#
+# ── Single-asset `.gz` extraction ────────────────────────────────────────────
+#   When the chosen `mode` filename ends in `.gz`, sync-binaries.sh decompresses
+#   the verified archive into a sibling executable (same dir, suffix dropped)
+#   and chmod +x's it.  The original `.gz` is preserved so the verified release
+#   artifact stays on disk.  The sha256 always pertains to the compressed `.gz`
+#   bytes that were downloaded, never to the decompressed payload.
+#
+# ── Refreshing the chisel pin ────────────────────────────────────────────────
+#   1. Pick the desired upstream tag at https://github.com/jpillora/chisel
+#   2. Download the matching checksums file:
+#        curl -fsSL -o chisel_<TAG>_checksums.txt \
+#          https://github.com/jpillora/chisel/releases/download/v<TAG>/chisel_<TAG>_checksums.txt
+#   3. Copy the sha256 next to chisel_<TAG>_linux_amd64.gz into the row below.
+#   4. Update tag and mode to match the new asset filename.
+#   5. Verify locally:
+#        STRICT_CHECKSUMS=1 bash scripts/dev/release-sanity.sh ../empusa
 #
 # After editing: labctl sync   (or scripts/sync-binaries.sh directly)
 #
-name	type	repo	tag	mode	dest	flags
-chisel	github-release	jpillora/chisel	v1.11.4	all-assets	chisel/v1.11.4	-
+name	type	repo	tag	mode	dest	flags	sha256
+chisel	github-release	jpillora/chisel	v1.11.4	chisel_1.11.4_linux_amd64.gz	chisel/v1.11.4	-	fecd47fcbd78514a1f8041897acbea8be3cdbb91afb98e32c3fc8bdc5ba53e27
 #
 # ── Examples (uncomment and adjust to activate) ────────────────────────────────
-#kerbrute	github-release	ropnop/kerbrute	v1.0.3	kerbrute_linux_amd64	kerbrute	executable
-#pspy	github-release	DominicBreuker/pspy	v1.2.1	pspy64	pspy	executable
-#ligolo-proxy	github-release	nicocha30/ligolo-ng	v0.7.5	all-assets	ligolo/v0.7.5	-
+#kerbrute	github-release	ropnop/kerbrute	v1.0.3	kerbrute_linux_amd64	kerbrute	executable	TODO_SHA256
+#pspy	github-release	DominicBreuker/pspy	v1.2.1	pspy64	pspy	executable	TODO_SHA256
+# all-assets is permitted only as a non-strict / dev-only pattern (no per-asset
+# checksums yet — strict release sanity will FAIL on any all-assets row):
+#ligolo-proxy	github-release	nicocha30/ligolo-ng	v0.7.5	all-assets	ligolo/v0.7.5	-	TODO_SHA256

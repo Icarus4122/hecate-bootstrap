@@ -125,3 +125,27 @@ sudo bash tests/e2e/run-validation.sh
 | `scripts/dev/ci-compose-lint.sh` | Compose config validation (all overlays) |
 | `scripts/dev/ci-contract-check.sh` | Empusa contract verification |
 | `scripts/dev/release-sanity.sh` | Cross-repo pre-release validation |
+
+## Binary sync supply-chain validation
+
+`scripts/sync-binaries.sh` reads `manifests/binaries.tsv` (8 columns including
+`sha256`) and verifies each downloaded artifact:
+
+- **Real 64-hex sha256** — computed via `sha256sum`, compared after download.
+  Mismatch → temp file deleted, destination not promoted, `[FAIL]` emitted,
+  process exits non-zero.
+- **`TODO_SHA256`** — accepted in default/dev mode with `[WARN] checksum not
+  pinned`.  Refused in **strict mode** with `[FAIL] checksum required`.
+- **Strict mode** — enabled via `STRICT_CHECKSUMS=1` env or `--strict-checksums`
+  flag.  Required for release-grade sync.
+- **`mode=all-assets`** — per-asset checksums are not yet supported; a real
+  sha256 on an all-assets row is rejected with `[FAIL]`.  Use TODO_SHA256 (with
+  a `[WARN]`) for those rows until per-asset pinning is added.
+
+`scripts/dev/ci-repo-integrity.sh` enforces the 8-column manifest layout, the
+`^[0-9a-f]{64}$|^TODO_SHA256$` format constraint on the `sha256` column, and
+emits a single `[WARN]` summary line listing how many rows are still unpinned.
+
+Checksums reduce supply-chain risk but do not eliminate it: a compromised
+upstream release could publish both the artifact and a matching digest.  Pair
+checksums with pinned tags and periodic rotation for defense in depth.

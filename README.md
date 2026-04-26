@@ -164,7 +164,7 @@ hecate-bootstrap/
 │
 ├── manifests/
 │   ├── apt-host.txt                -> host apt packages for bootstrap
-│   └── binaries.tsv                -> pinned binary manifest (TSV, 7 columns)
+│   └── binaries.tsv                -> pinned binary manifest (TSV, 8 columns)
 │
 ├── templates/                      -> markdown engagement/methodology templates
 │   ├── engagement.md               target.md    recon.md
@@ -317,13 +317,37 @@ Each download is validated with `file(1)`.  HTML, XML, and plain-text responses 
 rejected automatically.  For `all-assets` mode (e.g. chisel), every release asset is
 downloaded into a versioned subdirectory.
 
+### Checksum verification
+
+Every manifest row carries a `sha256` field.  Real 64-hex digests are verified after
+download via `sha256sum`; on mismatch the temp file is deleted, the destination is
+not promoted, and the run exits non-zero.
+
+`TODO_SHA256` is a transitional sentinel: in default/dev mode it produces a
+`[WARN] checksum not pinned` line and the download still succeeds.  For
+release-grade sync, run with strict mode to refuse any unpinned entries:
+
+```bash
+STRICT_CHECKSUMS=1 labctl sync          # via env var
+bash scripts/sync-binaries.sh --strict-checksums   # via flag
+```
+
+Notes:
+
+- Release tags are pinned but a tag alone does not guarantee artifact integrity -
+  always pair `tag` with a real `sha256` for releases.
+- `mode=all-assets` rows produce N files; per-asset checksums are not yet
+  supported.  Real `sha256` on an `all-assets` row is rejected with `[FAIL]`.
+- Checksums reduce supply-chain risk but do not eliminate it (a compromised
+  release could publish both the artifact and a matching digest).
+
 Set `GITHUB_TOKEN` to raise the API rate limit from 60 to 5,000 requests/hour:
 
 ```bash
 GITHUB_TOKEN=ghp_xxx labctl sync
 ```
 
-Manifest format (TSV, 7 columns):
+Manifest format (TSV, 8 columns):
 
 | Column | Example |
 | -------- | --------- |
@@ -334,6 +358,7 @@ Manifest format (TSV, 7 columns):
 | mode | `all-assets` or exact filename |
 | dest | `chisel/v1.11.4` |
 | flags | `-`, `executable`, `allow-text` |
+| sha256 | 64-hex digest, or `TODO_SHA256` |
 
 ## Empusa
 
@@ -510,11 +535,18 @@ For full flag documentation, see [docs/labctl.md](docs/labctl.md).
 ```bash
 labctl verify
 LAB_GPU=1 labctl verify          # include GPU runtime checks
+bash scripts/verify-host.sh --strict   # release/CI: promote selected
+                                       # readiness warnings to [FAIL]
 ```
 
 Runs read-only pre-flight checks: OS version, required commands, Docker health,
 `/opt/lab` layout, repo file presence, Empusa installation, binary sync state, and GPU
 runtime.  Returns non-zero on critical failures.  Does not modify the system.
+
+`--strict` is intended for release/CI host-readiness gating: missing `.env`,
+missing tmux profiles under `tmux/profiles/`, and unsynced chisel binaries are
+promoted from `[WARN]` to `[FAIL]`. Default verify behavior remains
+operator-friendly and treats those conditions as warnings.
 
 ## Platform Update
 

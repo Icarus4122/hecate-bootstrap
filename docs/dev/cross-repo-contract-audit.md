@@ -5,6 +5,11 @@
 - Empusa  → target v2.3.0
 - Hecate Bootstrap → target v0.2.0
 
+**Expected Empusa contract version:** `2.3.0`
+(pinned by `scripts/dev/release-sanity.sh::EXPECTED_EMPUSA_VERSION`;
+release-sanity verifies that this string and the Empusa source tree
+agree before a release is allowed)
+
 **Architectural boundary (locked):**
 - Hecate owns: bootstrap, host setup, Docker/Compose, tmux, labctl, lab/platform validation.
 - Empusa owns: workflow, workspace lifecycle, events, hooks, plugins, modules, services, artifacts, loot, reports.

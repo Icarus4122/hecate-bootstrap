@@ -162,4 +162,101 @@ FAIL=0; PASS=5; WARN=0; FAIL_LOG=()
 print_summary > "$OUT" 2>&1
 assert_contains "$(cat "$OUT")" "Host is ready" "summary: all-clear text"
 
+# ═══════════════════════════════════════════════════════════════════
+#  --strict mode promotion
+# ═══════════════════════════════════════════════════════════════════
+
+# _strict_warn: default mode behaves like _warn
+_reset
+STRICT_MODE=0
+_strict_warn "soft thing" > "$OUT" 2>&1
+assert_eq "1" "$WARN" "strict_warn(default): increments WARN"
+assert_eq "0" "$FAIL" "strict_warn(default): does not increment FAIL"
+assert_contains "$(cat "$OUT")" "[WARN]" "strict_warn(default): prints [WARN]"
+
+# _strict_warn: strict mode promotes to _fail
+_reset
+STRICT_MODE=1
+_strict_warn "release-readiness gap" > "$OUT" 2>&1
+assert_eq "0" "$WARN" "strict_warn(strict): does not increment WARN"
+assert_eq "1" "$FAIL" "strict_warn(strict): increments FAIL"
+assert_contains "$(cat "$OUT")" "[FAIL]" "strict_warn(strict): prints [FAIL]"
+STRICT_MODE=0
+
+# check_env_file: missing .env is WARN by default, FAIL under --strict
+_reset
+rm -f "$REPO_DIR/.env"
+STRICT_MODE=0
+check_env_file > "$OUT" 2>&1
+assert_eq "1" "$WARN" "env(default): missing .env -> WARN"
+assert_eq "0" "$FAIL" "env(default): missing .env -> no FAIL"
+
+_reset
+STRICT_MODE=1
+check_env_file > "$OUT" 2>&1
+assert_eq "0" "$WARN" "env(strict): missing .env -> no WARN"
+assert_eq "1" "$FAIL" "env(strict): missing .env -> FAIL"
+STRICT_MODE=0
+
+# check_env_file: present .env passes regardless of mode
+_reset
+touch "$REPO_DIR/.env"
+STRICT_MODE=1
+check_env_file > "$OUT" 2>&1
+assert_eq "0" "$FAIL" "env(strict): present .env -> no FAIL"
+assert_eq "1" "$PASS" "env(strict): present .env -> PASS"
+STRICT_MODE=0
+rm -f "$REPO_DIR/.env"
+
+# check_repo_files: missing tmux profiles is WARN by default, FAIL under --strict
+# The repo files themselves are still present from earlier setup; only
+# the profiles directory is being toggled here.
+_reset
+rm -rf "$REPO_DIR/tmux/profiles"
+STRICT_MODE=0
+check_repo_files > "$OUT" 2>&1
+assert_eq "1" "$WARN" "repo(default): missing tmux profiles -> WARN"
+assert_eq "0" "$FAIL" "repo(default): required files present -> no FAIL"
+
+_reset
+STRICT_MODE=1
+check_repo_files > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "repo(strict): missing tmux profiles -> FAIL"
+assert_eq "0" "$WARN" "repo(strict): missing tmux profiles -> no WARN"
+STRICT_MODE=0
+mkdir -p "$REPO_DIR/tmux/profiles"
+echo '#!/bin/bash' > "$REPO_DIR/tmux/profiles/default.sh"
+
+# check_binaries: unsynced chisel is WARN by default, FAIL under --strict
+_reset
+mkdir -p "$LAB_ROOT/tools/binaries"
+rm -rf "$LAB_ROOT/tools/binaries/chisel"
+STRICT_MODE=0
+check_binaries > "$OUT" 2>&1
+assert_eq "1" "$WARN" "binaries(default): unsynced chisel -> WARN"
+assert_eq "0" "$FAIL" "binaries(default): unsynced chisel -> no FAIL"
+
+_reset
+STRICT_MODE=1
+check_binaries > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "binaries(strict): unsynced chisel -> FAIL"
+assert_eq "0" "$WARN" "binaries(strict): unsynced chisel -> no WARN"
+STRICT_MODE=0
+
+# Required-command failure stays hard regardless of mode (sanity check
+# of the structural invariant: _fail is unconditional).
+_reset
+_fail "missing required cmd" > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "required cmd missing -> FAIL (default)"
+_reset
+STRICT_MODE=1
+_fail "missing required cmd" > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "required cmd missing -> FAIL (strict)"
+STRICT_MODE=0
+
+# --help documents --strict (run the real script, not the sourced funcs)
+help_out="$(bash "$SCRIPT" --help 2>&1)"
+assert_contains "$help_out" "--strict" "help: documents --strict flag"
+assert_contains "$help_out" "release/CI" "help: explains strict use case"
+
 end_tests

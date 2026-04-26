@@ -11,6 +11,9 @@
 #
 # Usage:
 #   bash scripts/verify-host.sh          Run all checks
+#   bash scripts/verify-host.sh --strict Promote selected release/CI
+#                                        readiness warnings to failures
+#   bash scripts/verify-host.sh --help   Show usage
 #   labctl verify                        (after adding dispatch - see below)
 #   LAB_GPU=1 bash scripts/verify-host.sh   Include GPU runtime checks
 #
@@ -23,6 +26,41 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(dirname "$SCRIPT_DIR")"
 LAB_ROOT="${LAB_ROOT:-/opt/lab}"
+
+# ── Mode flags ─────────────────────────────────────────────────────
+STRICT_MODE=0
+
+usage() {
+    cat <<'USAGE'
+Usage: verify-host.sh [--strict] [--help]
+
+Read-only host pre-flight checks for the Hecate lab.
+
+Options:
+  --strict   Promote selected release/CI readiness warnings to
+             [FAIL] (missing .env, missing tmux profiles, unsynced
+             chisel binaries). Hard failures already in default mode
+             remain hard failures. Intended for release/CI gating;
+             default mode stays operator-friendly.
+  --help     Show this message and exit.
+
+Environment:
+  LAB_ROOT   Root of the lab tree (default: /opt/lab)
+  LAB_GPU    Set to 1 to require NVIDIA driver/runtime
+USAGE
+}
+
+for arg in "$@"; do
+    case "$arg" in
+        --strict) STRICT_MODE=1 ;;
+        --help|-h) usage; exit 0 ;;
+        *)
+            printf '[FAIL] Unknown argument: %s\n' "$arg" >&2
+            usage >&2
+            exit 2
+            ;;
+    esac
+done
 
 # ── Shared UI primitives ──────────────────────────────────────────
 source "${REPO_DIR}/scripts/lib/ui.sh"
@@ -43,6 +81,20 @@ _fail() { ((FAIL++)) || true; ui_fail "$*"; FAIL_LOG+=("$*"); }
 _fix()  { ui_fix "$*"; }
 _note() { ui_note "$*"; }
 banner() { ui_section "$1"; }
+
+# Promote a warning to a failure under --strict.  In default mode it
+# behaves exactly like _warn; under STRICT_MODE=1 it becomes _fail and
+# contributes to the nonzero exit. Used only for clear release/CI
+# readiness gaps (missing .env, missing tmux profiles, unsynced
+# binaries). Hard failures already in default mode remain _fail
+# unconditionally.
+_strict_warn() {
+    if [[ "${STRICT_MODE:-0}" == "1" ]]; then
+        _fail "$*"
+    else
+        _warn "$*"
+    fi
+}
 
 # ═══════════════════════════════════════════════════════════════════
 #  1. Host OS
@@ -193,7 +245,7 @@ check_repo_files() {
     if [[ "$profiles_found" -gt 0 ]]; then
         _pass "tmux profiles - ${profiles_found} found"
     else
-        _warn "No tmux profiles found under tmux/profiles/"
+        _strict_warn "No tmux profiles found under tmux/profiles/"
         _note "labctl launch will not be able to set up tmux sessions."
     fi
 }
@@ -238,7 +290,7 @@ check_binaries() {
         count="$(find "${bin_dir}/chisel" -type f 2>/dev/null | wc -l)"
         _pass "chisel assets present (${count} files)"
     else
-        _warn "No chisel assets found — binaries have not been synced yet"
+        _strict_warn "No chisel assets found — binaries have not been synced yet"
         _fix "labctl sync"
     fi
 }
@@ -301,7 +353,7 @@ check_env_file() {
     if [[ -f "${REPO_DIR}/.env" ]]; then
         _pass ".env file present"
     else
-        _warn ".env file not found"
+        _strict_warn ".env file not found"
         _note "labctl uses .env for LAB_ROOT, GPU, and token settings."
         _fix "cp .env.example .env   (then edit as needed)"
     fi
@@ -342,6 +394,9 @@ print_summary() {
 main() {
     ui_banner "Hecate" "Host verification"
     echo ""
+    if [[ "${STRICT_MODE:-0}" == "1" ]]; then
+        ui_info "Strict mode: selected readiness warnings will be promoted to [FAIL]."
+    fi
     ui_info "This check is read-only — it will not modify your system."
 
     check_os
