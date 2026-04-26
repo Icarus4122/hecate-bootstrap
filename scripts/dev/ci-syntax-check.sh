@@ -11,9 +11,9 @@ ERRORS=0
 check() {
     local f="$1"
     if bash -n "$f" 2>/dev/null; then
-        echo "  ✓ $f"
+        echo "  [PASS] $f"
     else
-        echo "  ✗ $f"
+        echo "  [FAIL] $f"
         bash -n "$f" 2>&1 | sed 's/^/    /'
         ERRORS=$((ERRORS + 1))
     fi
@@ -43,7 +43,7 @@ done
 
 echo ""
 if [[ $ERRORS -gt 0 ]]; then
-    echo "✗ $ERRORS file(s) have syntax errors"
+    echo "[FAIL] $ERRORS file(s) have syntax errors"
     exit 1
 fi
-echo "✓ All files pass syntax check"
+echo "[PASS] All files pass syntax check"

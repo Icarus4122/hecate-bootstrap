@@ -27,4 +27,4 @@ systemctl restart docker
 echo "Verifying GPU passthrough..."
 docker run --rm --gpus all nvidia/cuda:12.6.0-base-ubuntu24.04 nvidia-smi
 
-echo "✓ NVIDIA Container Toolkit ready."
+echo "[PASS] NVIDIA Container Toolkit ready."

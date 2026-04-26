@@ -36,7 +36,7 @@ while [[ $# -gt 0 ]]; do
             echo "  labctl guide --explain  Read-only reference (prints all steps, runs nothing)"
             exit 0 ;;
         *)
-            echo "[!] Unknown flag: $1" >&2
+            echo "[FAIL] Unknown flag: $1" >&2
             echo "    Usage: labctl guide [--explain]" >&2
             exit 1 ;;
     esac
@@ -58,11 +58,11 @@ _body() {
 }
 
 _hint_done() {
-    echo "  [✓] Already done: $*"
+    echo "  [PASS] Already done: $*"
 }
 
 _hint_needed() {
-    echo "  [*] $*"
+    echo "  [INFO] $*"
 }
 
 # Prompt the operator.  Returns 0 = run, 1 = skip.  Exits on quit.
@@ -96,10 +96,10 @@ _run() {
         "$@" || rc=$?
         echo ""
         if [[ $rc -eq 0 ]]; then
-            echo "  [✓] Step succeeded."
+            echo "  [PASS] Step succeeded."
             return 0
         fi
-        echo "  [✗] Step failed (exit ${rc})."
+        echo "  [FAIL] Step failed (exit ${rc})."
         echo ""
         while true; do
             printf "  ► [r] retry    [s] skip    [q] quit\n"
@@ -143,7 +143,7 @@ EOF
     if _ask; then
         _run bash "$REPO_DIR/scripts/verify-host.sh"
     else
-        echo "  [=] Skipped."
+        echo "  [INFO] Skipped."
     fi
 }
 
@@ -188,7 +188,7 @@ EOF
     if _ask; then
         _run sudo bash "$REPO_DIR/scripts/bootstrap-host.sh"
     else
-        echo "  [=] Skipped."
+        echo "  [INFO] Skipped."
     fi
 }
 
@@ -219,7 +219,7 @@ EOF
     fi
 
     echo ""
-    echo "  [!] You are NOT in the 'docker' group yet."
+    echo "  [WARN] You are NOT in the 'docker' group yet."
     echo ""
     echo "  Bootstrap added you to the group, but your current shell"
     echo "  session doesn't know about it.  You need to either:"
@@ -289,7 +289,7 @@ EOF
     if _ask; then
         _run bash "$REPO_DIR/scripts/sync-binaries.sh"
     else
-        echo "  [=] Skipped."
+        echo "  [INFO] Skipped."
     fi
 }
 
@@ -336,7 +336,7 @@ EOF
         source "${REPO_DIR}/scripts/lib/compose.sh"
         _run _compose build
     else
-        echo "  [=] Skipped."
+        echo "  [INFO] Skipped."
     fi
 }
 
@@ -382,7 +382,7 @@ EOF
         source "${REPO_DIR}/scripts/lib/compose.sh"
         _run _compose up -d
     else
-        echo "  [=] Skipped."
+        echo "  [INFO] Skipped."
     fi
 }
 

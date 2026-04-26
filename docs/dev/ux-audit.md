@@ -1,5 +1,12 @@
 # labctl UX Audit — First-Time Operator Experience
 
+> **Status: historical audit (2026-04-05).** Recommendations in this
+> document predate the canonical UI vocabulary migration.  The current
+> Hecate vocabulary is `[PASS]`, `[FAIL]`, `[WARN]`, `[INFO]`,
+> `[ACTION]` (see `scripts/lib/ui.sh` and `docs/dev/output-style-guide.md`).
+> Where this audit recommends `[✓]`/`[✗]`/`[!]`, treat those as the
+> *intent* — the implemented form uses the bracketed-word tokens.
+
 **Date:** 2026-04-05
 **Scope:** End-to-end labctl flow for a first-time operator on Ubuntu 24.04
 

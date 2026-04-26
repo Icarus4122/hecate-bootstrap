@@ -4,6 +4,14 @@ This document defines the visual language for all `labctl` subcommands and
 supporting scripts.  Every operator-facing message should follow these rules
 so that output is scannable, consistent, and actionable.
 
+> **Canonical source:** `scripts/lib/ui.sh` is the runtime implementation
+> of the marker vocabulary and layout primitives defined here.  When in
+> doubt, defer to `lib/ui.sh` and use its helpers (`ui_pass`, `ui_fail`,
+> `ui_warn`, `ui_info`, `ui_action`, `ui_section`, `ui_summary_line`,
+> `ui_next_block`).  Examples in this guide using earlier glyph-based
+> tokens (`[✓]`, `[✗]`, `[!]`) are retained only as historical context;
+> all current scripts must emit the bracketed-word vocabulary below.
+
 ---
 
 ## 1. Banner
@@ -56,25 +64,26 @@ Rules:
 Every line of operational output starts with a **bracketed token** at a
 **fixed indent** (2 spaces before the bracket).
 
-| Token   | Meaning           | When to use |
-|---------|-------------------|-------------|
-| `[✓]`  | Pass / success    | A check passed, a step succeeded, a final "done" message |
-| `[✗]`  | Fail / error      | A check failed, an operation hit a fatal error |
-| `[!]`  | Warning / caution | Non-fatal issue, degraded but functional, operator attention needed |
-| `[*]`  | Info / progress   | Neutral informational line, "now doing X", status update |
-| `[=]`  | Skipped / no-op   | Step was skipped, item already current, nothing to do |
-| `[~]`  | Changed / diff    | Something differs from expected (e.g., file size mismatch) |
-| `[+]`  | Added / new       | New file downloaded, new directory created |
+| Token      | Meaning           | When to use |
+|------------|-------------------|-------------|
+| `[PASS]`   | Pass / success    | A check passed, a step succeeded, a final "done" message |
+| `[FAIL]`   | Fail / error      | A check failed, an operation hit a fatal error |
+| `[WARN]`   | Warning / caution | Non-fatal issue, degraded but functional, operator attention needed |
+| `[INFO]`   | Info / progress   | Neutral informational line, "now doing X", status update, skipped step |
+| `[ACTION]` | Next-step / cmd   | Recommended command the operator should run next |
+
+These are the only canonical markers.  Helpers live in `scripts/lib/ui.sh`
+(`ui_pass`, `ui_fail`, `ui_warn`, `ui_info`, `ui_action`).
 
 ### Indentation
 
 ```
-  [✓]  Item passed                    ← 2-space indent, then token, then 2 spaces, then text
-       Remediation or detail line     ← 7-space indent (aligned under text above)
+  [PASS]  Item passed                  ← 2-space indent, then token, then 2 spaces, then text
+          Remediation or detail line   ← 10-space indent (aligned under text above)
 ```
 
-Detail lines (remediation, notes) are indented to align with the text
-after the token — **7 spaces** from the left margin.
+Detail lines (remediation, notes) align under the text that follows the
+token.  `lib/ui.sh` provides `ui_fix` and `ui_note` for this.
 
 ---
 
@@ -196,9 +205,12 @@ Rules:
 
 ## 10. Colour
 
-No ANSI colours.  The tokens `[✓]`, `[✗]`, `[!]` provide enough visual
-structure in any terminal.  This keeps output clean when piped, redirected,
-or viewed in CI logs.
+No ANSI colours required for structural meaning.  The tokens
+`[PASS]`, `[FAIL]`, `[WARN]`, `[INFO]`, `[ACTION]` provide enough visual
+structure in any terminal.  `lib/ui.sh` *does* apply ANSI colour to its
+markers when stdout is a TTY, and respects `NO_COLOR=1` to disable it.
+Output remains structurally readable when colour is stripped (piped,
+redirected, or in CI logs).
 
 ---
 
@@ -207,26 +219,33 @@ or viewed in CI logs.
 Fatal errors go to stderr.  Format:
 
 ```
-[✗] What went wrong.
-    Why it probably happened.
-    Fix: copy-pasteable remediation command
+[FAIL] What went wrong.
+       Why it probably happened.
+       Fix: copy-pasteable remediation command
 ```
 
 Always three parts when possible:
-1. **What** — one sentence, `[✗]` prefix.
+1. **What** — one sentence, `[FAIL]` prefix.
 2. **Why** — brief context (optional but preferred).
 3. **Fix** — actionable command.
+
+`lib/ui.sh` exposes `ui_error_block "what" "why" "cause" "fix"` to
+emit this shape consistently.
 
 ---
 
 ## 12. Success Messages
 
-Single-line, `[✓]` prefix, with the obvious next command:
+Single-line, `[PASS]` prefix.  Follow-up commands are emitted as a
+separate `[ACTION]` block (`ui_action` / `ui_next_block`) so the
+operator can scan success and next-step independently:
 
 ```
-[✓] Lab is running.  Next: labctl shell
-[✓] Images built.  Next: labctl up
-[✓] Lab stopped.  Data in /opt/lab is intact.
+[PASS] Lab is running.
+
+[ACTION] Next
+      labctl shell
+      labctl status
 ```
 
 ---

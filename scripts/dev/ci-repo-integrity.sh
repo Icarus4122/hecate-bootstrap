@@ -12,8 +12,8 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 PASS=0
 FAIL=0
 
-pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
-fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1"; }
+pass() { PASS=$((PASS + 1)); echo "  [PASS] $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  [FAIL] $1"; }
 
 echo "── Repo integrity ──"
 

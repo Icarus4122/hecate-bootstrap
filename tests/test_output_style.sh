@@ -6,7 +6,7 @@
 # check structural properties of output helpers, not exact wording.
 #
 # What this catches:
-#   - Missing or malformed status markers (must use [✓] [✗] [!] [*] [=])
+#   - Missing or malformed status markers (must use [PASS] [FAIL] [WARN] [INFO] [ACTION])
 #   - Inconsistent helper naming across scripts
 #   - Missing summary/result blocks in multi-step scripts
 #   - Missing "Next steps" or "Fix:" remediation patterns

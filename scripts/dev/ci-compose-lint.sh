@@ -20,8 +20,8 @@ if [[ ! -f "$REPO/.env" ]]; then
 fi
 trap '[[ "${CREATED_ENV:-0}" -eq 1 ]] && rm -f "$REPO/.env"' EXIT
 
-pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
-fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1"; }
+pass() { PASS=$((PASS + 1)); echo "  [PASS] $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  [FAIL] $1"; }
 
 # Detect compose command
 COMPOSE_CMD=""
@@ -30,7 +30,7 @@ if docker compose version &>/dev/null 2>&1; then
 elif command -v docker-compose &>/dev/null; then
     COMPOSE_CMD="docker-compose"
 else
-    echo "✗ Neither 'docker compose' nor 'docker-compose' found"
+    echo "[FAIL] Neither 'docker compose' nor 'docker-compose' found"
     exit 1
 fi
 echo "Using: $COMPOSE_CMD"

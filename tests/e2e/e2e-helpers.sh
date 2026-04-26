@@ -315,7 +315,7 @@ print_final_report() {
         if [[ ${#E2E_FAILED_ITEMS[@]} -gt 0 ]]; then
             echo "  ── Failed Items ──"
             for item in "${E2E_FAILED_ITEMS[@]}"; do
-                echo "    ✗ ${item}"
+                echo "    [FAIL] ${item}"
             done
             echo ""
         fi
@@ -512,7 +512,7 @@ assert_idempotent() {
     fi
 
     # Second run should not produce error markers
-    if echo "$out2" | grep -qE '\[✗\]|ERROR|FATAL|Traceback'; then
+    if echo "$out2" | grep -qE '\[FAIL\]|ERROR|FATAL|Traceback'; then
         _record_fail "$label: no errors on rerun" "error markers in output" "clean rerun"
     else
         _record_pass "$label: no errors on rerun"
@@ -764,11 +764,11 @@ assert_structured_output() {
     local has_summary=0 has_result=0 has_markers=0
     echo "$output" | grep -qi 'summary' && has_summary=1
     echo "$output" | grep -qi 'result:' && has_result=1
-    echo "$output" | grep -qE '\[✓\]|\[✗\]|\[!\]|\[\*\]|\[=\]' && has_markers=1
+    echo "$output" | grep -qE '\[PASS\]|\[FAIL\]|\[WARN\]|\[INFO\]|\[ACTION\]' && has_markers=1
 
     [[ $has_summary -eq 1 ]] && _record_pass "$label: has summary" || _record_fail "$label: has summary" "missing" "Summary section"
     [[ $has_result -eq 1 ]]  && _record_pass "$label: has Result:" || _record_fail "$label: has Result:" "missing" "Result: label"
-    [[ $has_markers -eq 1 ]] && _record_pass "$label: has markers" || _record_fail "$label: has markers" "missing" "[✓]/[✗]/[!] markers"
+    [[ $has_markers -eq 1 ]] && _record_pass "$label: has markers" || _record_fail "$label: has markers" "missing" "[PASS]/[FAIL]/[WARN]/[INFO]/[ACTION] markers"
 }
 
 # ── Markdown structure assertion ──────────────────────────────────

@@ -19,7 +19,7 @@ HECATE_DIR="$(cd "$SCRIPT_DIR/../.." && pwd)"
 EMPUSA_DIR="${EMPUSA_SRC:-$(dirname "$HECATE_DIR")/empusa}"
 
 if [[ ! -f "$EMPUSA_DIR/pyproject.toml" ]]; then
-    echo "✗ Empusa not found at $EMPUSA_DIR"
+    echo "[FAIL] Empusa not found at $EMPUSA_DIR"
     echo "  Set EMPUSA_SRC to override."
     exit 1
 fi
@@ -29,7 +29,7 @@ PY="${PYTHON:-}"
 if [[ -z "$PY" ]]; then
     if   command -v python3 &>/dev/null; then PY=python3
     elif command -v python  &>/dev/null; then PY=python
-    else echo "✗ python not found"; exit 1
+    else echo "[FAIL] python not found"; exit 1
     fi
 fi
 
@@ -50,29 +50,29 @@ cd "$EMPUSA_DIR"
 V=$(grep '__version__' empusa/__init__.py | head -1 | sed 's/.*"\(.*\)".*/\1/')
 TV=$(grep '^version = ' pyproject.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
 if [[ "$V" != "$TV" ]]; then
-    echo "✗ version mismatch: __init__=$V  pyproject.toml=$TV"
+    echo "[FAIL] version mismatch: __init__=$V  pyproject.toml=$TV"
     exit 1
 fi
-echo "✓ version $V consistent"
+echo "[PASS] version $V consistent"
 
 # Changelog
 if grep -qF "[$V]" CHANGELOG.md; then
-    echo "✓ [$V] in CHANGELOG.md"
+    echo "[PASS] [$V] in CHANGELOG.md"
 else
-    echo "✗ [$V] not found in CHANGELOG.md"
+    echo "[FAIL] [$V] not found in CHANGELOG.md"
     exit 1
 fi
 
 # Tag (advisory — not a hard failure)
 if git tag -l "v$V" | grep -q .; then
-    echo "✓ tag v$V exists"
+    echo "[PASS] tag v$V exists"
 else
-    echo "⚠ tag v$V not found (pre-release)"
+    echo "[WARN] tag v$V not found (pre-release)"
 fi
 
 # Lint
 echo ""
-$PY -m ruff check empusa/ tests/ && echo "✓ ruff clean"
+$PY -m ruff check empusa/ tests/ && echo "[PASS] ruff clean"
 
 # Tests
 echo ""

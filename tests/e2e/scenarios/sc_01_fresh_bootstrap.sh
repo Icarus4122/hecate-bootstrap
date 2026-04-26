@@ -155,7 +155,7 @@ section "Output Quality"
 # Every step should have used standard markers
 for step_out_var in verify_out sync_out build_out up_out launch_out status_out down_out; do
     step_out="${!step_out_var}"
-    if echo "$step_out" | grep -qE '\[✓\]|\[✗\]|\[!\]|\[\*\]|\[=\]'; then
+    if echo "$step_out" | grep -qE '\[PASS\]|\[FAIL\]|\[WARN\]|\[INFO\]|\[ACTION\]'; then
         _record_pass "output: $step_out_var uses markers"
     else
         _record_pass "output: $step_out_var (no markers — acceptable for short output)"

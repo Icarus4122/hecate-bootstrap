@@ -19,7 +19,7 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 EMPUSA_DIR="${1:-${EMPUSA_SRC:-$(dirname "$REPO")/empusa}}"
 
 if [[ ! -f "$EMPUSA_DIR/pyproject.toml" ]]; then
-    echo "✗ Empusa not found at $EMPUSA_DIR"
+    echo "[FAIL] Empusa not found at $EMPUSA_DIR"
     echo "  Pass path as argument or set EMPUSA_SRC."
     exit 1
 fi
@@ -31,13 +31,13 @@ if [[ -z "$PY" ]]; then
         PY="$EMPUSA_DIR/.venv/bin/python"
     elif command -v python3 &>/dev/null; then PY=python3
     elif command -v python &>/dev/null; then PY=python
-    else echo "✗ Python not found"; exit 1; fi
+    else echo "[FAIL] Python not found"; exit 1; fi
 fi
 
 PASS=0
 FAIL=0
-pass() { PASS=$((PASS + 1)); echo "  ✓ $1"; }
-fail() { FAIL=$((FAIL + 1)); echo "  ✗ $1"; }
+pass() { PASS=$((PASS + 1)); echo "  [PASS] $1"; }
+fail() { FAIL=$((FAIL + 1)); echo "  [FAIL] $1"; }
 
 echo "── Empusa contract validation ──"
 echo "  Empusa: $EMPUSA_DIR"

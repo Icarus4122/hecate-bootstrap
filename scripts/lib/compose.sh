@@ -25,7 +25,7 @@ _compose() {
     elif command -v docker-compose &>/dev/null; then
         docker-compose "${files[@]}" "$@"
     else
-        echo "[✗] Docker Compose is not installed." >&2
+        echo "[FAIL] Docker Compose is not installed." >&2
         echo "    Neither 'docker compose' (plugin) nor 'docker-compose' (standalone) was found." >&2
         echo "    Install the Compose plugin (recommended):" >&2
         echo "      sudo apt install docker-compose-plugin" >&2
