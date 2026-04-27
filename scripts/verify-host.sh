@@ -100,7 +100,7 @@ _strict_warn() {
 #  1. Host OS
 # ═══════════════════════════════════════════════════════════════════
 check_os() {
-    banner "1/9  Host OS"
+    banner "1/10  Host OS"
     if [[ -f /etc/os-release ]]; then
         # shellcheck disable=SC1091
         . /etc/os-release
@@ -121,7 +121,7 @@ check_os() {
 #  2. Required host commands
 # ═══════════════════════════════════════════════════════════════════
 check_commands() {
-    banner "2/9  Required host commands"
+    banner "2/10  Required host commands"
     local cmds=(docker git curl jq file python3)
     for cmd in "${cmds[@]}"; do
         if command -v "$cmd" &>/dev/null; then
@@ -146,7 +146,7 @@ check_commands() {
 #  3. Docker health
 # ═══════════════════════════════════════════════════════════════════
 check_docker() {
-    banner "3/9  Docker health"
+    banner "3/10  Docker health"
     if docker info &>/dev/null; then
         _pass "Docker daemon is reachable"
     else
@@ -172,7 +172,7 @@ check_docker() {
 #  4. /opt/lab layout
 # ═══════════════════════════════════════════════════════════════════
 check_lab_layout() {
-    banner "4/9  ${LAB_ROOT} directory tree"
+    banner "4/10  ${LAB_ROOT} directory tree"
 
     if [[ ! -d "$LAB_ROOT" ]]; then
         _fail "${LAB_ROOT} does not exist"
@@ -211,7 +211,7 @@ check_lab_layout() {
 #  5. Repository files
 # ═══════════════════════════════════════════════════════════════════
 check_repo_files() {
-    banner "5/9  Repository files"
+    banner "5/10  Repository files"
 
     local _pre_fail_count=$FAIL
     local files=(
@@ -254,7 +254,7 @@ check_repo_files() {
 #  6. Empusa installation
 # ═══════════════════════════════════════════════════════════════════
 check_empusa() {
-    banner "6/9  Empusa (workspace engine)"
+    banner "6/10  Empusa (workspace engine)"
     local empusa_bin="${LAB_ROOT}/tools/venvs/empusa/bin/empusa"
 
     if [[ -x "$empusa_bin" ]]; then
@@ -273,7 +273,7 @@ check_empusa() {
 #  7. Binary sync destination
 # ═══════════════════════════════════════════════════════════════════
 check_binaries() {
-    banner "7/9  Synced binaries"
+    banner "7/10  Synced binaries"
     local bin_dir="${LAB_ROOT}/tools/binaries"
 
     if [[ -d "$bin_dir" ]]; then
@@ -299,7 +299,7 @@ check_binaries() {
 #  8. GPU (optional)
 # ═══════════════════════════════════════════════════════════════════
 check_gpu() {
-    banner "8/9  GPU (optional)"
+    banner "8/10  GPU (optional)"
 
     if ! command -v nvidia-smi &>/dev/null; then
         if [[ "${LAB_GPU:-0}" == "1" ]]; then
@@ -348,7 +348,7 @@ check_gpu() {
 #  9. .env file
 # ═══════════════════════════════════════════════════════════════════
 check_env_file() {
-    banner "9/9  Configuration"
+    banner "9/10  Configuration"
 
     if [[ -f "${REPO_DIR}/.env" ]]; then
         _pass ".env file present"
@@ -357,6 +357,89 @@ check_env_file() {
         _note "labctl uses .env for LAB_ROOT, GPU, and token settings."
         _fix "cp .env.example .env   (then edit as needed)"
     fi
+}
+
+# ═══════════════════════════════════════════════════════════════════
+#  10. Evidentia (evidence runtime)
+# ═══════════════════════════════════════════════════════════════════
+# Hecate's responsibility ends at binary availability and a minimal
+# JSON-shape sanity check on `evidentia version`. Hecate must NOT:
+#   - call ingest, replay, or audit
+#   - open Evidentia's Badger store
+#   - parse or interpret Evidentia schemas beyond the documented
+#     `version` field
+#
+# Empusa expects `evidentia` either on PATH or installed at the
+# canonical Hecate toolchain location:
+#
+#   ${LAB_ROOT}/tools/binaries/evidentia/evidentia
+#
+# Operators may also pin a specific binary via the shared environment
+# variable EVIDENTIA_BINARY (Phase 18 contract); when set to an
+# executable file it wins over both PATH and the toolchain fallback.
+# Empusa code may override the path via its own --binary flag; this
+# check verifies that one of the discovery paths resolves and that
+# the binary responds with the documented JSON shape.
+check_evidentia() {
+    banner "10/10  Evidentia (evidence runtime)"
+    local ev_path_bin="${LAB_ROOT}/tools/binaries/evidentia/evidentia"
+    local ev_env_bin="${EVIDENTIA_BINARY:-}"
+    local ev_bin=""
+
+    if [[ -n "$ev_env_bin" ]]; then
+        if [[ -x "$ev_env_bin" ]]; then
+            ev_bin="$ev_env_bin"
+        else
+            _fail "EVIDENTIA_BINARY=${ev_env_bin} is not an executable file"
+            _fix "Point EVIDENTIA_BINARY at an executable evidentia binary, or unset it."
+            return
+        fi
+    elif command -v evidentia &>/dev/null; then
+        ev_bin="$(command -v evidentia)"
+    elif [[ -x "$ev_path_bin" ]]; then
+        ev_bin="$ev_path_bin"
+    else
+        _warn "evidentia not found on PATH or at ${ev_path_bin}"
+        _note "Without Evidentia, the Empusa evidence integration is disabled."
+        _fix "Install evidentia to ${ev_path_bin}, set EVIDENTIA_BINARY, or add it to PATH."
+        return
+    fi
+
+    local ver_out
+    if ! ver_out="$("$ev_bin" version 2>/dev/null)"; then
+        _fail "evidentia found at ${ev_bin} but 'evidentia version' failed"
+        _fix "Reinstall the evidentia binary or check execute permissions."
+        return
+    fi
+
+    # Validate the documented JSON shape strictly: stdout MUST be a
+    # JSON object with exactly one key, "version", whose value is a
+    # non-empty string. Hecate does NOT interpret the version value
+    # or any other Evidentia schema. Validation is delegated to
+    # python3 (already a required command checked earlier in this
+    # script) so multiline/wrapped/extra-key payloads are rejected.
+    if ! printf '%s' "$ver_out" | python3 -c '
+import json, sys
+try:
+    obj = json.loads(sys.stdin.read())
+except Exception:
+    sys.exit(1)
+if type(obj) is not dict:
+    sys.exit(1)
+if set(obj.keys()) != {"version"}:
+    sys.exit(1)
+v = obj["version"]
+if type(v) is not str or v == "":
+    sys.exit(1)
+sys.exit(0)
+' 2>/dev/null; then
+        _fail "evidentia version output does not match contract: must be {\"version\":\"<non-empty string>\"}"
+        _note "Got: ${ver_out}"
+        _fix "Reinstall the evidentia binary; expected JSON exactly like {\"version\":\"0.1.0\"}."
+        return
+    fi
+
+    _pass "evidentia available at ${ev_bin} - ${ver_out}"
 }
 
 # ═══════════════════════════════════════════════════════════════════
@@ -408,6 +491,7 @@ main() {
     check_binaries
     check_gpu
     check_env_file
+    check_evidentia
     print_summary
 
     if [[ "$FAIL" -gt 0 ]]; then

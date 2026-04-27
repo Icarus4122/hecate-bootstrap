@@ -259,4 +259,211 @@ help_out="$(bash "$SCRIPT" --help 2>&1)"
 assert_contains "$help_out" "--strict" "help: documents --strict flag"
 assert_contains "$help_out" "release/CI" "help: explains strict use case"
 
+# ═══════════════════════════════════════════════════════════════════
+#  check_evidentia - binary discovery + JSON-shape sanity
+# ═══════════════════════════════════════════════════════════════════
+
+# Hecate must NOT shell out to Evidentia for ingest/replay/audit and
+# must NOT parse schemas beyond the documented `version` field. Tests
+# below exercise: missing binary, version command failure, malformed
+# JSON output, and a valid response. A sandbox PATH is used to keep
+# `command -v evidentia` deterministic across host setups.
+
+_EV_DIR="$LAB_ROOT/tools/binaries/evidentia"
+_EV_BIN="$_EV_DIR/evidentia"
+
+# Override PATH so `command -v evidentia` only sees what we control,
+# but keep python3 reachable (Phase 17B validates the version JSON
+# shape via `python3 -c json.loads(...)` inside check_evidentia).
+_EV_PATH_DIR="$SANDBOX/path-bin"
+mkdir -p "$_EV_PATH_DIR"
+_ORIG_PATH="$PATH"
+_PY3_BIN="$(command -v python3 || command -v python || true)"
+_PY3_DIR=""
+if [[ -n "$_PY3_BIN" ]]; then
+    _PY3_DIR="$(dirname "$_PY3_BIN")"
+fi
+export PATH="$_EV_PATH_DIR:/usr/bin:/bin${_PY3_DIR:+:$_PY3_DIR}"
+
+_clean_evidentia() {
+    rm -rf "$_EV_DIR" "$_EV_PATH_DIR"
+    mkdir -p "$_EV_PATH_DIR"
+}
+
+# Case 1: binary missing on PATH and at toolchain path -> WARN
+_reset
+_clean_evidentia
+check_evidentia > "$OUT" 2>&1
+assert_eq "0" "$FAIL" "evidentia: missing -> no FAIL"
+assert_eq "1" "$WARN" "evidentia: missing -> 1 WARN"
+assert_contains "$(cat "$OUT")" "evidentia not found" "evidentia: WARN message"
+
+# Case 2: binary present at toolchain path but `version` exits non-zero
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo "boom" >&2
+exit 1
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "evidentia: version exits non-zero -> FAIL"
+assert_eq "0" "$WARN" "evidentia: version failure -> no WARN"
+assert_contains "$(cat "$OUT")" "version' failed" "evidentia: failure message"
+
+# Case 3: binary present, version succeeds, but stdout is not the
+#         documented JSON shape -> FAIL (no schema interpretation
+#         beyond confirming the contract field).
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo "evidentia v0.1.0"
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "evidentia: invalid JSON output -> FAIL"
+assert_contains "$(cat "$OUT")" "does not match contract" "evidentia: contract diagnosis"
+
+# Case 4: binary present at toolchain path, valid JSON -> PASS
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo '{"version":"0.1.0"}'
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "0" "$FAIL" "evidentia: valid -> no FAIL"
+assert_eq "1" "$PASS" "evidentia: valid -> 1 PASS"
+assert_contains "$(cat "$OUT")" "evidentia available at" "evidentia: PASS message"
+assert_contains "$(cat "$OUT")" '"version":"0.1.0"' "evidentia: PASS includes version JSON"
+
+# Case 5: binary present on PATH (not at toolchain path) -> PASS
+_reset
+_clean_evidentia
+cat > "$_EV_PATH_DIR/evidentia" <<'STUB'
+#!/bin/bash
+echo '{"version":"9.9.9"}'
+STUB
+chmod +x "$_EV_PATH_DIR/evidentia"
+check_evidentia > "$OUT" 2>&1
+assert_eq "0" "$FAIL" "evidentia(PATH): valid -> no FAIL"
+assert_eq "1" "$PASS" "evidentia(PATH): valid -> 1 PASS"
+assert_contains "$(cat "$OUT")" '"version":"9.9.9"' "evidentia(PATH): PASS includes version JSON"
+
+# Case 6: valid JSON with surrounding whitespace / newlines -> PASS.
+# The contract permits whitespace around tokens; only the object
+# shape and key set are normative.
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+printf '   {  "version"  :  "0.2.0"  }   \n'
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "0" "$FAIL" "evidentia: whitespace JSON -> no FAIL"
+assert_eq "1" "$PASS" "evidentia: whitespace JSON -> 1 PASS"
+assert_contains "$(cat "$OUT")" "0.2.0" "evidentia: whitespace JSON -> PASS includes version"
+
+# Case 7: wrapped JSON with extra top-level key -> FAIL.
+# Even though the regex-friendly substring '"version":"x"' is
+# present, the contract forbids unrelated keys.
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo '{"version":"0.1.0","extra":"nope"}'
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "evidentia: wrapped JSON with extra keys -> FAIL"
+assert_contains "$(cat "$OUT")" "does not match contract" "evidentia: wrapped JSON diagnosis"
+
+# Case 8: random output that contains the substring "version":"x"
+#         but is NOT a JSON object -> FAIL.
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo 'log noise: "version":"0.1.0" extra trailing garbage'
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "evidentia: noisy substring -> FAIL"
+assert_contains "$(cat "$OUT")" "does not match contract" "evidentia: noisy substring diagnosis"
+
+# Case 9: empty version string -> FAIL (must be non-empty per contract).
+_reset
+_clean_evidentia
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo '{"version":""}'
+STUB
+chmod +x "$_EV_BIN"
+check_evidentia > "$OUT" 2>&1
+assert_eq "1" "$FAIL" "evidentia: empty version -> FAIL"
+assert_contains "$(cat "$OUT")" "does not match contract" "evidentia: empty version diagnosis"
+
+# ── Phase 18: shared environment contract ─────────────────────────
+# EVIDENTIA_BINARY pins a specific binary; when it points at an
+# executable file it MUST win over both PATH and the toolchain
+# fallback. When it is set but invalid, the check MUST fail clearly
+# (no silent fallback) so a misconfigured pin is surfaced.
+
+# Case 10: EVIDENTIA_BINARY -> valid executable wins over PATH+toolchain.
+_reset
+_clean_evidentia
+# Populate BOTH PATH and toolchain with stubs that emit a different
+# version, so the only way the test passes the env-binary version
+# string is if the env override actually took precedence.
+mkdir -p "$_EV_DIR"
+cat > "$_EV_BIN" <<'STUB'
+#!/bin/bash
+echo '{"version":"from-toolchain"}'
+STUB
+chmod +x "$_EV_BIN"
+cat > "$_EV_PATH_DIR/evidentia" <<'STUB'
+#!/bin/bash
+echo '{"version":"from-path"}'
+STUB
+chmod +x "$_EV_PATH_DIR/evidentia"
+
+_EV_ENV_DIR="$SANDBOX/env-bin"
+mkdir -p "$_EV_ENV_DIR"
+_EV_ENV_BIN="$_EV_ENV_DIR/evidentia-pinned"
+cat > "$_EV_ENV_BIN" <<'STUB'
+#!/bin/bash
+echo '{"version":"from-env"}'
+STUB
+chmod +x "$_EV_ENV_BIN"
+export EVIDENTIA_BINARY="$_EV_ENV_BIN"
+check_evidentia > "$OUT" 2>&1
+unset EVIDENTIA_BINARY
+assert_eq "0" "$FAIL" "evidentia(ENV): valid -> no FAIL"
+assert_eq "1" "$PASS" "evidentia(ENV): valid -> 1 PASS"
+assert_contains "$(cat "$OUT")" "from-env" "evidentia(ENV): pin wins over PATH and toolchain"
+
+# Case 11: EVIDENTIA_BINARY -> invalid path fails clearly.
+_reset
+_clean_evidentia
+export EVIDENTIA_BINARY="$SANDBOX/does/not/exist/evidentia"
+check_evidentia > "$OUT" 2>&1
+unset EVIDENTIA_BINARY
+assert_eq "1" "$FAIL" "evidentia(ENV): invalid path -> FAIL"
+assert_contains "$(cat "$OUT")" "EVIDENTIA_BINARY=" "evidentia(ENV): error names the variable"
+assert_contains "$(cat "$OUT")" "not an executable file" "evidentia(ENV): error explains the problem"
+
+# Restore PATH for any subsequent tests.
+export PATH="$_ORIG_PATH"
+
 end_tests
